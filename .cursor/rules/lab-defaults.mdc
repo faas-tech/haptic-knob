@@ -1,0 +1,13 @@
+---
+description: Haptic Knob Lab stack and SDK boundaries
+alwaysApply: true
+---
+
+# Lab defaults
+
+This is a Vite + React + TypeScript Chrome app for the ECM SmartKnob. Read `docs/knob-interface.md` before adding a Bluetooth command.
+
+- Connection and parsers live in `src/sdk/`. Demos live in `src/demos/` and receive `sendKnobCommand`.
+- Name functions with readable-names: `connectSmartKnob`, `applyHapticMode`, `parseStatusLine`.
+- Chrome on macOS is the first browser. Web Bluetooth needs a click.
+- Detent mode has one stiffness for every click unless we send a new settings line.

@@ -1,0 +1,10 @@
+---
+description: Human documentation and a required last-sentence slop pass
+alwaysApply: true
+---
+
+# Straight talk
+
+Write documentation, comments, and on-screen copy with Give It to Me Straight (`~/.agents/skills/give-it-to-me-straight/SKILL.md`).
+
+After the draft exists, run a second pass. Read `references/second-pass.md`. Check the last sentence of every paragraph. Cut `it's not X, it's Y`, `not X, but Y`, and leftover `X, not Y` closers unless the reader asked for that comparison. If the closer only restates or hedges, delete it.

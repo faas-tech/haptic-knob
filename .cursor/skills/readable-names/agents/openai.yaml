@@ -1,0 +1,4 @@
+interface:
+  display_name: "Readable Names"
+  short_description: "Literal, unit-bearing code and file names"
+  default_prompt: "Use $readable-names to choose clear identifiers that name what the code actually does."

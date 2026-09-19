@@ -1,0 +1,151 @@
+:root {
+  color: #f4f1ea;
+  background: #10141c;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  background: #f4f1ea;
+  color: #10141c;
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0.6rem 1.1rem;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.connect-bar,
+.demo-copy {
+  padding: 1.25rem 1.5rem;
+}
+
+.connect-bar {
+  align-items: center;
+  border-bottom: 1px solid #2a3140;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.eyebrow {
+  color: #9aa4b5;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+}
+
+.status-line,
+.readout,
+.operator-message,
+.warning {
+  margin: 0.15rem 0 0;
+}
+
+.warning,
+.operator-message {
+  color: #c7b387;
+}
+
+.demo h1 {
+  font-size: 2rem;
+  margin: 0 0 0.6rem;
+}
+
+.demo-copy p {
+  max-width: 42rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ruler-window {
+  background: #d8c39a;
+  border-top: 1px solid #2a3140;
+  height: 220px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ruler-track {
+  height: 100%;
+  position: relative;
+}
+
+.ruler-track::after {
+  background: #2a2114;
+  bottom: 36px;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+.tick {
+  background: #2a2114;
+  bottom: 36px;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 2px;
+}
+
+.tick-sixteenth {
+  height: 14px;
+}
+
+.tick-quarter {
+  height: 28px;
+}
+
+.tick-half {
+  height: 44px;
+}
+
+.tick-inch {
+  height: 68px;
+  width: 3px;
+}
+
+.tick em {
+  bottom: 76px;
+  color: #2a2114;
+  font-style: normal;
+  font-weight: 700;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.hairline {
+  background: #b42318;
+  height: 100%;
+  left: 50%;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 2px;
+}

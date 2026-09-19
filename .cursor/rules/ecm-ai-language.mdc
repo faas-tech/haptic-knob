@@ -1,0 +1,13 @@
+---
+description: Plain documentation and on-screen wording. Load ecm-ai-language for prose.
+alwaysApply: true
+---
+
+# Plain documentation
+
+Read `.cursor/skills/ecm-ai-language/SKILL.md` when writing documentation, diagram labels, or interface copy. Code identifiers use readable-names.
+
+- Name the actor and action. Use ordinary verbs: use, check, save, compare, send.
+- Avoid leverage, unlock, robust, seamless, holistic.
+- Explain purpose before implementation details. Prefer a clear sentence to a compressed noun stack.
+- Keep one term for one meaning. Show the current identifier beside the explanation when the reader needs to find it.

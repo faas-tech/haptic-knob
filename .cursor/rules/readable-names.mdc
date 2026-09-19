@@ -1,0 +1,16 @@
+---
+description: Literal, unit-bearing code and file names. Load readable-names before naming identifiers.
+alwaysApply: true
+---
+
+# Readable names
+
+Read `.cursor/skills/readable-names/SKILL.md` and `references/identifiers.md` when naming or renaming code. Apply the general rules. Use ECM examples only when their meaning fits.
+
+- Name what something is and what it does. A longer name is useful when it saves guessing.
+- Functions: verb + object + necessary qualifier. Booleans: `is`, `has`, `should`, `can`. Numbers include the measure and unit. Collections say what they hold; maps say what they index.
+- Do not name a value for a later state you hope it reaches.
+- Keep one term for one meaning across code, screens, diagrams, and docs.
+- Avoid vague names when they hide the subject: `data`, `info`, `item`, `utils`, `helper`, `manager`, `engine`, `orchestrator`, `pipeline`, `hub`, `core`, `base`, `common`, `flow`.
+- Preserve required framework, API, and protocol names.
+- This skill does not authorize a rename refactor. Apply it in the requested change.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "ECM AI Language"
+  short_description: "Plain vocabulary and precise application names"
+  default_prompt: "Use $ecm-ai-language to make this explanation or naming choice clear while preserving its technical meaning."
