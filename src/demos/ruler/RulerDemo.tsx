@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MotorIcon } from "../../brand/LabIcons";
 import {
   applyHapticMode,
   detentSettingsCommand,
@@ -15,10 +16,18 @@ import {
   RULER_LENGTH_INCHES,
   rulerMarkKind,
   SIXTEENTHS_PER_INCH,
+  type RulerMarkKind,
 } from "./rulerMarks";
 
 const INCHES_PER_REVOLUTION = 1;
-const PIXELS_PER_INCH = 96;
+const PIXELS_PER_INCH = 112;
+
+const INTENSITY_RANKS: { kind: RulerMarkKind; label: string }[] = [
+  { kind: "sixteenth", label: "1/16" },
+  { kind: "quarter", label: "1/4" },
+  { kind: "half", label: "1/2" },
+  { kind: "inch", label: "1 in" },
+];
 
 export function RulerDemo(props: {
   isConnected: boolean;
@@ -30,7 +39,7 @@ export function RulerDemo(props: {
   const [isMotorEnabled, setIsMotorEnabled] = useState(false);
   const [hasAppliedRulerDetents, setHasAppliedRulerDetents] = useState(false);
   const [operatorMessage, setOperatorMessage] = useState(
-    "Power the knob, connect, enable the motor, then apply detents. Arrow keys move the on-screen ruler when the knob is offline.",
+    "Power the knob, connect, enable the motor, then apply detents. Arrow keys move the ruler when the knob is offline.",
   );
   const unwrappedDegreesRef = useRef<number | null>(null);
   const originDegreesRef = useRef<number | null>(null);
@@ -133,31 +142,78 @@ export function RulerDemo(props: {
     );
   };
 
+  const currentMarkKind = rulerMarkKind(positionInches);
+  const currentIntensityIndex = INTENSITY_RANKS.findIndex(
+    (rank) => rank.kind === currentMarkKind,
+  );
+  const detentSettings = detentSettingsForRulerMark(currentMarkKind);
   const viewportOffsetPx = positionInches * PIXELS_PER_INCH;
+  const travelPercent = (positionInches / RULER_LENGTH_INCHES) * 100;
 
   return (
-    <section className="demo">
+    <section className="demo ruler-demo">
       <div className="demo-copy">
-        <h1>12-inch ruler</h1>
-        <p>
-          One full turn moves one inch. Sixteen detents per turn are the
-          sixteenths. The firmware takes one stiffness at a time, so the lab
-          raises stiffness at a quarter, half, or inch mark.
-        </p>
-        <p className="readout">
-          {positionInches.toFixed(4)} in / {RULER_LENGTH_INCHES} in
-        </p>
+        <div className="demo-heading">
+          <p className="eyebrow">Detent · 16 clicks / rev</p>
+          <h1>12-inch ruler</h1>
+          <p>
+            One full turn moves one inch. Sixteen detents per turn are the
+            sixteenths. Firmware takes one stiffness at a time, so the lab
+            raises it at a quarter, half, or inch.
+          </p>
+        </div>
+
+        <div className="hud-panel">
+          <div className="readout-block">
+            <p className="readout-label">Position</p>
+            <p className="readout">
+              {positionInches.toFixed(4)}
+              <small> in</small>
+            </p>
+          </div>
+          <div className="intensity-board" aria-label="Detent intensity">
+            {INTENSITY_RANKS.map((rank, index) => (
+              <span
+                key={rank.kind}
+                className={
+                  index <= currentIntensityIndex
+                    ? "intensity-pip is-lit"
+                    : "intensity-pip"
+                }
+              >
+                {rank.label}
+              </span>
+            ))}
+          </div>
+          <div className="stiffness-readout">
+            <p className="readout-label">Stiffness / damping</p>
+            <p className="readout-meta">
+              k={detentSettings.stiffnessPercent} · b={detentSettings.dampingPercent}
+            </p>
+          </div>
+        </div>
+
+        <div className="travel-track" aria-hidden="true">
+          <span className="travel-fill" style={{ width: `${travelPercent}%` }} />
+        </div>
+        <span className="travel-caption">
+          {positionInches.toFixed(2)} / {RULER_LENGTH_INCHES} in
+        </span>
+
         <p className="operator-message">{operatorMessage}</p>
         <div className="actions">
           <button
             type="button"
+            className={isMotorEnabled ? "button-ghost" : "button-primary"}
             disabled={!props.isConnected}
             onClick={() => void enableRulerMotor()}
           >
+            <MotorIcon className="button-icon" />
             {isMotorEnabled ? "Motor enabled" : "Enable motor"}
           </button>
           <button
             type="button"
+            className="button-primary"
             disabled={!props.isConnected}
             onClick={() => void applyRulerDetents()}
           >
@@ -171,7 +227,8 @@ export function RulerDemo(props: {
           className="ruler-track"
           style={{
             width: RULER_LENGTH_INCHES * PIXELS_PER_INCH,
-            transform: `translateX(calc(50% - ${viewportOffsetPx}px))`,
+            left: "50%",
+            transform: `translateX(-${viewportOffsetPx}px)`,
           }}
         >
           {rulerMarks.map((rulerMark) => (
@@ -187,6 +244,7 @@ export function RulerDemo(props: {
           ))}
         </div>
         <div className="hairline" />
+        <div className="ruler-brass-edge" />
       </div>
     </section>
   );

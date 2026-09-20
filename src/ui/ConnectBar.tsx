@@ -1,3 +1,4 @@
+import { BluetoothIcon } from "../brand/LabIcons";
 import type { KnobConnectionStatus } from "../sdk";
 
 export function ConnectBar(props: {
@@ -11,33 +12,36 @@ export function ConnectBar(props: {
   const canConnect = props.connectionStatus !== "connecting";
   const isConnected = props.connectionStatus === "connected";
 
-  let statusLabel = "SmartKnob not connected";
+  let statusLabel = "SmartKnob offline";
   if (props.connectionStatus === "connecting") {
-    statusLabel = "Connecting...";
+    statusLabel = "Connecting…";
   } else if (isConnected) {
-    statusLabel = `Connected to ${props.deviceName}`;
+    statusLabel = props.deviceName ?? "Connected";
   } else if (props.connectionStatus === "error") {
     statusLabel = props.errorMessage ?? "Connection failed";
   }
 
   return (
-    <header className="connect-bar">
-      <div>
-        <p className="eyebrow">Haptic Knob Lab</p>
+    <div className="connect-bar">
+      <div className="connect-status">
+        <span
+          className={`signal-dot signal-${props.connectionStatus}`}
+          aria-hidden="true"
+        />
+        <BluetoothIcon className="connect-icon" />
         <p className="status-line">{statusLabel}</p>
-        {!props.isWebBluetoothSupported && (
-          <p className="warning">
-            Open this page in Google Chrome. Safari has no Web Bluetooth.
-          </p>
-        )}
       </div>
+      {!props.isWebBluetoothSupported && (
+        <p className="warning">Use Google Chrome on this Mac.</p>
+      )}
       <button
         type="button"
+        className={isConnected ? "button-ghost" : "button-primary"}
         disabled={!canConnect}
         onClick={isConnected ? props.onDisconnect : props.onConnect}
       >
         {isConnected ? "Disconnect" : "Connect Smart Knob"}
       </button>
-    </header>
+    </div>
   );
 }
