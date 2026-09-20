@@ -1,0 +1,1083 @@
+.golf-demo {
+  --course-accent: #e4edba;
+  --course-surface: rgba(17, 35, 31, 0.88);
+  --course-border: rgba(224, 238, 205, 0.2);
+  --course-muted: #b5c7ba;
+  isolation: isolate;
+  min-height: 620px;
+  overflow: hidden;
+  color: #f8f8ef;
+}
+.disc-golf-demo {
+  --course-accent: #9af3da;
+  --course-surface: rgba(16, 30, 47, 0.9);
+  --course-border: rgba(135, 231, 218, 0.23);
+  --course-muted: #b4c9d2;
+}
+.course-interface {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.course-interface button {
+  pointer-events: auto;
+}
+.course-interface button:disabled {
+  pointer-events: none;
+  opacity: 0.4;
+}
+.golf-demo button:focus-visible,
+.golf-demo input:focus-visible {
+  outline: 2px solid var(--course-accent);
+  outline-offset: 4px;
+}
+.course-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    #07191638,
+    transparent 25%,
+    transparent 60%,
+    #061611c2
+  );
+  pointer-events: none;
+}
+.course-eyebrow {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--course-accent);
+}
+.course-score-panel {
+  position: absolute;
+  top: 28px;
+  left: 30px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  column-gap: 18px;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: 14px;
+  padding: 18px 20px 12px;
+  width: 360px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 14px 35px #07150f22;
+}
+.course-hole-number {
+  font-size: 43px;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  color: var(--course-accent);
+  font-weight: 500;
+}
+.course-hole-number small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  margin-top: 6px;
+  text-align: center;
+  color: var(--course-muted);
+}
+.course-hole-details h2 {
+  font-size: 23px;
+  font-weight: 500;
+  margin: 4px 0 2px;
+  letter-spacing: -0.035em;
+}
+.course-hole-details > p:last-child {
+  font-size: 11px;
+  color: var(--course-muted);
+  margin: 0;
+}
+.course-hole-details > p span {
+  padding: 0 6px;
+}
+.course-round-score {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  border-left: 1px solid var(--course-border);
+  padding-left: 16px;
+  justify-content: center;
+  gap: 4px;
+}
+.course-round-score strong {
+  font-size: 28px;
+  font-weight: 400;
+}
+.course-round-score small {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--course-muted);
+}
+.course-hole-progress {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 5px;
+  margin-top: 16px;
+}
+.course-hole-progress span {
+  background: #ffffff15;
+  flex: 1;
+  height: 3px;
+  border-radius: 5px;
+}
+.course-hole-progress .is-complete {
+  background: var(--course-accent);
+  opacity: 0.4;
+}
+.course-hole-progress .is-current {
+  background: var(--course-accent);
+  box-shadow: 0 0 8px #e2efb24d;
+}
+.course-overview-panel {
+  position: absolute;
+  right: 30px;
+  top: 28px;
+  width: 160px;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: 14px;
+  padding: 13px;
+  backdrop-filter: blur(20px);
+}
+.course-overview-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--course-muted);
+}
+.course-overview-map {
+  width: 100%;
+  height: 140px;
+  display: block;
+  color: var(--course-accent);
+}
+.course-wind {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid var(--course-border);
+}
+.course-wind-arrow {
+  font-size: 24px;
+  color: var(--course-accent);
+  width: 20px;
+  text-align: center;
+}
+.course-wind strong {
+  font-weight: 500;
+  font-size: 20px;
+}
+.course-wind small {
+  font-size: 10px;
+  color: var(--course-muted);
+}
+.course-wind > span:last-child {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  margin-left: auto;
+  color: var(--course-muted);
+}
+.course-distance-panel {
+  position: absolute;
+  left: 34px;
+  bottom: 43px;
+  text-shadow: 0 2px 15px #03150999;
+}
+.course-distance-panel > strong {
+  display: block;
+  font-size: clamp(44px, 5vw, 70px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.065em;
+  margin: 5px 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+.course-distance-panel > strong small {
+  font-size: 19px;
+  margin-left: 6px;
+  letter-spacing: -0.01em;
+  color: var(--course-muted);
+}
+.course-lie {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  margin: 0 0 7px;
+}
+.course-lie > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--course-accent);
+}
+.course-strokes {
+  font-size: 11px;
+  margin: 0;
+  color: #f4f7ed;
+}
+.course-strokes > span {
+  color: var(--course-muted);
+}
+.course-controls {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 430px;
+  padding: 12px 16px;
+  border: 1px solid var(--course-border);
+  border-radius: 18px;
+  background: var(--course-surface);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 16px 60px #04170f55;
+}
+.course-equipment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 12px;
+}
+.course-equipment > div:nth-child(3) {
+  flex: 1;
+}
+.course-equipment strong {
+  font-size: 15px;
+  font-weight: 500;
+  display: block;
+}
+.course-equipment small {
+  display: block;
+  color: var(--course-muted);
+  font-size: 10px;
+  margin-top: 3px;
+}
+.course-equipment button,
+.course-aim-buttons button {
+  background: #ffffff0a;
+  border: 1px solid #ffffff13;
+  color: #fff;
+  border-radius: 7px;
+  min-height: 30px;
+  width: 28px;
+  padding: 0;
+  font-size: 20px;
+}
+.course-equipment button:hover,
+.course-aim-buttons button:hover {
+  background: #ffffff22;
+}
+.course-equipment-icon {
+  height: 40px;
+  width: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--course-accent);
+}
+.course-equipment-icon svg {
+  width: 38px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+.course-control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.course-mode-tabs {
+  display: flex;
+  gap: 2px;
+  background: #0003;
+  padding: 3px;
+  border-radius: 8px;
+}
+.course-mode-tabs button {
+  background: transparent;
+  color: var(--course-muted);
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+.course-mode-tabs button.is-active {
+  background: #ffffff16;
+  color: #fff;
+}
+.golf-demo kbd {
+  font-family: inherit;
+  font-size: 9px;
+  border: 1px solid #ffffff2b;
+  border-radius: 3px;
+  padding: 1px 3px;
+  color: var(--course-muted);
+}
+.course-mode-tabs kbd {
+  border: 0;
+  color: inherit;
+  opacity: 0.6;
+  padding: 0 4px 0 0;
+}
+.course-aim-buttons {
+  display: flex;
+  gap: 3px;
+}
+.course-aim-buttons button {
+  font-size: 14px;
+  min-height: 36px;
+}
+.course-charge-button {
+  flex: 1;
+  background: var(--course-accent);
+  color: #183d32;
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  touch-action: none;
+  user-select: none;
+}
+.course-charge-button:hover {
+  filter: brightness(1.08);
+}
+.course-charge-button.is-charging {
+  box-shadow: 0 0 20px #c9ed9d55;
+  background: #f2f7d1;
+}
+.course-control-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 9px;
+  color: var(--course-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.course-control-hint kbd:not(:first-child) {
+  margin-left: 7px;
+}
+.course-power-panel {
+  position: absolute;
+  right: 52px;
+  bottom: 43px;
+  text-align: center;
+  width: 50px;
+}
+.course-power-track {
+  width: 12px;
+  height: 136px;
+  position: relative;
+  background: #ffffff20;
+  border-radius: 10px;
+  margin: 0 auto 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px #ffffff2b;
+}
+.course-power-track > div {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(0deg, #7cbaa1, #d8ecac 70%, #fff3c6);
+  box-shadow: 0 0 15px #d8ecac80;
+}
+.course-power-track > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ffffff66;
+  top: 25%;
+}
+.course-power-track > span:nth-of-type(2) {
+  top: 50%;
+}
+.course-power-track > span:nth-of-type(3) {
+  top: 75%;
+}
+.course-power-scale {
+  position: absolute;
+  height: 136px;
+  left: -13px;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 8px;
+  color: var(--course-muted);
+}
+.course-power-panel > strong {
+  font-size: 20px;
+  font-weight: 500;
+}
+.course-power-panel > strong small {
+  font-size: 11px;
+  color: var(--course-muted);
+}
+.course-power-panel > p {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--course-muted);
+  margin: 3px 0 0;
+}
+.course-power-panel .throw-bend-meter {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 145px;
+  margin-left: -60px;
+}
+.course-power-panel .throw-bend-meter svg {
+  width: 145px;
+}
+.course-status-message {
+  position: absolute;
+  bottom: 197px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  padding: 9px 16px;
+  max-width: 460px;
+  border-radius: 9px;
+  color: #e5ecdc;
+  font-size: 11px;
+  text-align: center;
+  margin: 0;
+  animation: course-rise 0.3s ease both;
+}
+.course-flight-label {
+  position: absolute;
+  left: 50%;
+  top: 30px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: 30px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.course-flight-label span {
+  width: 5px;
+  height: 5px;
+  background: var(--course-accent);
+  border-radius: 50%;
+  animation: course-blink 1s ease-in-out infinite;
+}
+.course-shot-result {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  padding: 14px 20px;
+  border-radius: 14px;
+  animation: course-result-arrive 3.2s ease both;
+}
+.course-result-mark {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--course-border);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  font-size: 23px;
+  color: var(--course-accent);
+}
+.course-shot-result strong {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+.course-shot-result strong small {
+  font-size: 12px;
+  color: var(--course-muted);
+}
+.course-shot-result > p {
+  color: var(--course-muted);
+  font-size: 11px;
+  border-left: 1px solid var(--course-border);
+  padding-left: 14px;
+}
+.course-shot-result > p span {
+  display: block;
+  margin-top: 4px;
+  color: var(--course-accent);
+}
+.golf-demo .golf-round-overlay {
+  background: linear-gradient(90deg, #071813dd, #07181355 55%, #07181300);
+  justify-content: flex-start;
+  padding: clamp(24px, 5vw, 72px);
+}
+.golf-demo .golf-round-card {
+  border: 1px solid var(--course-border);
+  background: var(--course-surface);
+  backdrop-filter: blur(24px);
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 460px;
+  box-shadow: 0 25px 70px #07181344;
+}
+.golf-demo .course-welcome .golf-round-card {
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  max-width: 380px;
+  overflow: visible;
+}
+.golf-demo .golf-dash-kicker {
+  color: var(--course-accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+.golf-demo .course-welcome h2 {
+  font-size: clamp(48px, 5.5vw, 78px);
+  font-weight: 400;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 22px 0;
+}
+.golf-demo .course-welcome h2 em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  color: var(--course-accent);
+}
+.course-welcome-tags {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 24px;
+}
+.course-welcome-tags span {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--course-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--course-accent);
+}
+.golf-demo .golf-round-copy {
+  color: #d0dbd1;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+.golf-demo .golf-name-label {
+  color: var(--course-muted);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin: 5px 0;
+}
+.golf-demo .golf-name-form input {
+  border-color: var(--course-border);
+  background: #ffffff09;
+  border-radius: 8px;
+  min-height: 48px;
+}
+.golf-demo .button-primary {
+  color: #17372e;
+  background: var(--course-accent);
+  border: 0;
+  box-shadow: none;
+  border-radius: 8px;
+  min-height: 46px;
+  font-size: 13px;
+}
+.course-welcome-controls {
+  font-size: 11px;
+  color: var(--course-muted);
+  line-height: 2.1;
+  margin: 22px 0;
+}
+.course-welcome-controls kbd {
+  margin: 0 3px;
+}
+.golf-demo .golf-leaderboard-empty {
+  border-top: 1px solid var(--course-border);
+  padding-top: 16px;
+  color: var(--course-muted);
+  font-size: 11px;
+}
+.golf-demo .golf-round-card-results {
+  max-width: 620px;
+  width: 620px;
+  text-align: center;
+  margin: auto;
+}
+.golf-demo .golf-round-card-results h2 {
+  font-size: 34px;
+  font-weight: 400;
+  margin-top: 10px;
+}
+.course-results-badge {
+  color: var(--course-accent);
+  font-size: 34px;
+  margin-top: 16px;
+  animation: course-seal-arrive 0.8s ease both;
+}
+.golf-demo .golf-round-total {
+  font-size: 70px;
+  font-weight: 400;
+  color: var(--course-accent);
+  line-height: 1;
+  margin: 18px 0;
+}
+.golf-demo .golf-round-total span {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--course-muted);
+  margin-top: 10px;
+}
+.golf-demo .golf-scorecard {
+  gap: 5px;
+  margin: 24px 0 18px;
+}
+.golf-demo .golf-scorecard li {
+  background: #ffffff08;
+  border: 1px solid var(--course-border);
+  border-radius: 7px;
+  padding: 9px 3px;
+  animation: course-rise 0.5s ease both;
+}
+.golf-demo .golf-scorecard .is-under-par {
+  border-color: var(--course-accent);
+  background: #b4edc318;
+}
+.golf-demo .golf-scorecard .is-over-par strong {
+  color: #efcbaa;
+}
+.golf-demo .golf-scorecard strong {
+  font-size: 23px;
+  margin: 8px 0;
+}
+.golf-demo .golf-leaderboard caption {
+  color: var(--course-accent);
+}
+.golf-demo .golf-leaderboard th {
+  color: var(--course-muted);
+}
+.golf-demo .golf-hole-intro {
+  top: auto;
+  bottom: 62px;
+  left: 52px;
+  transform: none;
+  text-align: left;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  border-radius: 16px;
+  padding: 28px;
+  min-width: 330px;
+  max-width: 420px;
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+  animation: course-rise 0.6s ease both;
+}
+.course-intro-number {
+  position: absolute;
+  right: 14px;
+  top: 3px;
+  font-size: 140px;
+  line-height: 1;
+  letter-spacing: -0.07em;
+  font-weight: 700;
+  color: #ffffff07;
+}
+.golf-demo .golf-hole-intro h2 {
+  font-size: 36px;
+  font-weight: 500;
+  margin: 12px 0;
+}
+.golf-demo .golf-hole-intro-line {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--course-accent);
+}
+.golf-demo .golf-hole-intro-wind {
+  color: var(--course-muted);
+  font-family: inherit;
+  font-size: 11px;
+  margin: 10px 0;
+}
+.golf-demo .golf-hole-intro .golf-round-copy {
+  font-size: 12px;
+  margin: 12px 0;
+}
+.course-intro-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--course-border);
+  padding-top: 14px;
+  margin-top: 22px;
+}
+.course-intro-footer > span {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--course-muted);
+}
+.course-intro-footer button {
+  pointer-events: auto;
+  color: var(--course-accent);
+  background: transparent;
+  padding: 0;
+  min-height: 26px;
+  font-size: 11px;
+  position: relative;
+}
+.course-intro-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: #ffffff0d;
+}
+.course-intro-progress span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--course-accent);
+  transform-origin: left;
+}
+.golf-demo .golf-made-callout {
+  top: 40%;
+  padding: 30px 44px;
+  border-radius: 24px;
+  background: var(--course-surface);
+  border: 1px solid var(--course-border);
+  min-width: 310px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 20px 80px #00120f66;
+  animation: course-celebrate 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.course-celebration-seal {
+  font-size: 48px;
+  color: var(--course-accent);
+  margin: 10px 0;
+  animation: course-seal-arrive 0.8s ease both;
+}
+.golf-demo .golf-made-kicker {
+  color: #fffbed;
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.golf-demo .golf-made-detail {
+  font-size: 13px;
+  color: var(--course-accent);
+  font-weight: 400;
+  margin-top: 18px;
+}
+.course-celebration-next {
+  font-size: 10px;
+  color: var(--course-muted);
+  margin: 12px 0 0;
+}
+@keyframes course-rise {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes course-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes course-seal-arrive {
+  from {
+    opacity: 0;
+    transform: rotate(-50deg) scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+@keyframes course-celebrate {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -40%) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes course-result-arrive {
+  0% {
+    opacity: 0;
+    translate: 0 -12px;
+  }
+  12%,
+  85% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+}
+@media (max-width: 1050px) {
+  .course-score-panel {
+    width: 315px;
+    padding: 14px;
+    gap: 12px;
+    top: 18px;
+    left: 18px;
+  }
+  .course-hole-details h2 {
+    font-size: 20px;
+  }
+  .course-overview-panel {
+    right: 18px;
+    top: 18px;
+    width: 134px;
+  }
+  .course-overview-map {
+    height: 115px;
+  }
+  .course-distance-panel {
+    left: 22px;
+    bottom: 220px;
+  }
+  .course-power-panel {
+    bottom: 225px;
+    right: 30px;
+  }
+  .course-controls {
+    bottom: 24px;
+  }
+  .course-status-message {
+    bottom: 196px;
+  }
+  .course-shot-result {
+    top: 165px;
+  }
+  .course-flight-label {
+    top: 160px;
+  }
+}
+@media (max-width: 600px) {
+  .golf-demo {
+    min-height: 680px;
+  }
+  .course-score-panel {
+    top: 14px;
+    left: 14px;
+    width: calc(100% - 122px);
+    column-gap: 9px;
+    padding: 12px;
+  }
+  .course-hole-number {
+    font-size: 30px;
+  }
+  .course-hole-details .course-eyebrow {
+    font-size: 7px;
+  }
+  .course-hole-details h2 {
+    font-size: 18px;
+  }
+  .course-hole-details > p:last-child {
+    font-size: 10px;
+  }
+  .course-round-score {
+    padding-left: 8px;
+  }
+  .course-round-score strong {
+    font-size: 22px;
+  }
+  .course-round-score small {
+    font-size: 6px;
+  }
+  .course-overview-panel {
+    right: 12px;
+    top: 14px;
+    width: 92px;
+    padding: 9px;
+  }
+  .course-overview-heading {
+    font-size: 6px;
+  }
+  .course-overview-map {
+    height: 85px;
+  }
+  .course-wind {
+    gap: 4px;
+  }
+  .course-wind strong {
+    font-size: 16px;
+  }
+  .course-wind > span:last-child {
+    display: none;
+  }
+  .course-controls {
+    width: calc(100% - 28px);
+    bottom: 18px;
+    padding: 12px;
+  }
+  .course-control-row {
+    gap: 5px;
+  }
+  .course-mode-tabs button {
+    padding: 0 6px;
+  }
+  .course-control-hint {
+    font-size: 8px;
+    gap: 4px;
+  }
+  .course-status-message {
+    width: calc(100% - 36px);
+    bottom: 187px;
+  }
+  .course-distance-panel {
+    bottom: 241px;
+    left: 22px;
+  }
+  .course-distance-panel > strong {
+    font-size: 46px;
+  }
+  .course-strokes > span {
+    display: none;
+  }
+  .course-power-panel {
+    bottom: 241px;
+    right: 20px;
+  }
+  .course-power-track {
+    height: 100px;
+  }
+  .course-power-scale {
+    height: 100px;
+  }
+  .course-shot-result {
+    top: 180px;
+    padding: 10px 16px;
+    white-space: nowrap;
+  }
+  .course-flight-label {
+    top: 183px;
+  }
+  .golf-demo .golf-round-overlay {
+    padding: 28px;
+    background: linear-gradient(90deg, #071813ec, #07181377);
+  }
+  .golf-demo .golf-round-card {
+    padding: 20px;
+    max-height: calc(100% - 20px);
+  }
+  .golf-demo .course-welcome h2 {
+    font-size: 58px;
+  }
+  .golf-demo .golf-hole-intro {
+    left: 18px;
+    bottom: 30px;
+    min-width: 0;
+    width: calc(100% - 36px);
+    padding: 24px;
+  }
+  .golf-demo .golf-made-callout {
+    min-width: 280px;
+    padding: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .golf-demo *,
+  .golf-demo *::before,
+  .golf-demo *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.app-shell:has(.golf-demo) {
+  height: 100dvh;
+  min-height: 720px;
+}
+.app-shell:has(.golf-demo) .app-stage {
+  min-height: 0;
+}
+.app-shell .golf-demo {
+  height: 100%;
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .app-shell:has(.golf-demo) .lab-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 7px 10px;
+    padding: 10px 14px;
+  }
+  .app-shell:has(.golf-demo) .lab-brand {
+    flex-direction: row;
+    align-items: center;
+  }
+  .app-shell:has(.golf-demo) .lab-title-block {
+    display: none;
+  }
+  .app-shell:has(.golf-demo) .lab-header-extra {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .app-shell:has(.golf-demo) .golf-header-actions {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .app-shell:has(.golf-demo) .lab-header button {
+    min-height: 32px;
+    font-size: 11px;
+    padding: 7px 12px;
+  }
+  .app-shell:has(.golf-demo) .connect-bar {
+    flex-direction: row;
+    align-items: center;
+  }
+  .app-shell:has(.golf-demo) .connect-status:not(:has(.signal-error)) {
+    display: none;
+  }
+  .app-shell:has(.golf-demo) .connect-status {
+    font-size: 10px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 600px) {
+  .course-power-panel .throw-bend-meter {
+    width: 120px;
+    margin-left: -55px;
+  }
+  .course-power-panel .throw-bend-meter svg {
+    width: 120px;
+  }
+}

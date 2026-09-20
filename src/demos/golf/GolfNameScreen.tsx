@@ -16,12 +16,22 @@ export function GolfNameScreen(props: {
   const readyName = normalizePlayerName(playerName);
 
   return (
-    <div className="golf-round-overlay">
+    <div className="golf-round-overlay course-welcome">
       <div className="golf-round-card">
-        <p className="golf-dash-kicker">{COURSE_NAME}</p>
-        <h2>Nine holes. Par {COURSE_PAR}.</h2>
+        <p className="golf-dash-kicker">THE PARKLAND COLLECTION</p>
+        <h2>
+          {COURSE_NAME.split(" ")[0]}
+          <br />
+          <em>{COURSE_NAME.split(" ").slice(1).join(" ")}</em>
+        </h2>
+        <div className="course-welcome-tags">
+          <span>9 HOLES</span>
+          <span>PAR {COURSE_PAR}</span>
+          <span>GOLDEN HOUR</span>
+        </div>
         <p className="golf-round-copy">
-          Put your name on the card. A flyover runs before every tee.
+          Find your line through rolling greens and pine-lined fairways. Make
+          every stroke count.
         </p>
         <form
           className="golf-name-form"
@@ -48,9 +58,14 @@ export function GolfNameScreen(props: {
             className="button-primary"
             disabled={!isPlayerNameReady(readyName)}
           >
-            Start round
+            Step onto the tee ↗
           </button>
         </form>
+        <p className="course-welcome-controls">
+          Play with your knob, mouse, or keyboard.
+          <br />
+          <kbd>← →</kbd> Aim <kbd>SPACE</kbd> Hold and release
+        </p>
         <GolfLeaderboardTable
           entries={props.leaderboard}
           emptyCopy="No cards yet. The first name on the board is yours."

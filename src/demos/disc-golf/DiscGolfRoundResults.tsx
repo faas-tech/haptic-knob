@@ -23,8 +23,15 @@ export function DiscGolfRoundResults(props: {
   return (
     <div className="golf-round-overlay">
       <div className="golf-round-card golf-round-card-results disc-golf-card">
-        <p className="golf-dash-kicker">{COURSE_NAME} · Card</p>
-        <h2>{props.playerName}</h2>
+        <p className="golf-dash-kicker">{COURSE_NAME} · Round complete</p>
+        <div className="course-results-badge" aria-hidden="true">
+          ✦
+        </div>
+        <h2>
+          Nicely played,
+          <br />
+          {props.playerName}.
+        </h2>
         <p className="golf-round-total">
           {totalThrows}
           <span>
@@ -33,15 +40,25 @@ export function DiscGolfRoundResults(props: {
         </p>
         <ol className="golf-scorecard">
           {NINE_HOLE_COURSE.map((courseHole, index) => (
-            <li key={courseHole.holeNumber}>
+            <li
+              key={courseHole.holeNumber}
+              className={
+                (props.holeScores[index] ?? courseHole.par) < courseHole.par
+                  ? "is-under-par"
+                  : (props.holeScores[index] ?? courseHole.par) > courseHole.par
+                    ? "is-over-par"
+                    : "is-par"
+              }
+            >
               <span>{courseHole.holeNumber}</span>
-              <strong>{props.holeScores[index] ?? "—"}</strong>
+              <strong>{props.holeScores[index] ?? "-"}</strong>
               <em>p{courseHole.par}</em>
             </li>
           ))}
         </ol>
         <p className="golf-round-copy">
-          Water {props.waterPenaltyCount} · Trees {props.treeHitCount}
+          Water penalties {props.waterPenaltyCount} · Tree hits{" "}
+          {props.treeHitCount}
         </p>
         <DiscGolfLeaderboardTable
           entries={props.leaderboard}

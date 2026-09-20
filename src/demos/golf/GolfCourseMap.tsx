@@ -1,11 +1,24 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import {
+  addCourseEnvironment,
+  animateCourseScenery,
+  createCourseTree,
+  createFairway,
+  createFairwayFringe,
+  createTeeFurniture,
+  createTurfMaterial,
+  createWater,
+  disposeCourseObject,
+} from "../course-visuals/courseScenery";
+import {
+  createCameraSmoothing,
+  createShotEffects,
+} from "../course-visuals/shotEffects";
+import {
   COURSE_WORLD_DEPTH_YARDS,
   COURSE_WORLD_WIDTH_YARDS,
-  distanceYards,
   sampledFairwayPath,
-  type CourseCircle,
   type CourseHole,
   type CoursePointYards,
 } from "./golfCourse";
@@ -14,26 +27,19 @@ import { aimFlightArcPoints } from "./golfShot";
 
 const NAVY = 0x0a1628;
 const WHITE = 0xf4f7fb;
-const FAIRWAY = 0x1a8a64;
-const GREEN = 0x4ad07a;
-const COLLAR = 0x237a4c;
+const FAIRWAY = 0x7cab54;
+const GREEN = 0x99bf67;
+const COLLAR = 0x638b49;
 const SAND = 0xe8c57a;
-const WATER = 0x2aa3c7;
-const WATER_RIM = 0x176f86;
-const ROUGH = 0x0c3d32;
-const TREE_LEAF = 0x145c3a;
-const TREE_TRUNK = 0x4a3422;
 const FLAG = 0xe11d2e;
-const ECM_BLUE = 0x0073cf;
-const FEET_PER_YARD = 3;
-const PLAY_CAMERA_BACK_YARDS = 10 / FEET_PER_YARD;
+const PLAY_CAMERA_BACK_YARDS = 13;
 const PLAY_CAMERA_SIDE_YARDS = 1.35;
-const PLAY_CAMERA_EYE_HEIGHT_YARDS = 5.8 / FEET_PER_YARD;
-const PLAY_CAMERA_LOOK_AHEAD_YARDS = 36;
-const PUTT_CAMERA_BACK_YARDS = 4.2;
+const PLAY_CAMERA_EYE_HEIGHT_YARDS = 7;
+const PLAY_CAMERA_LOOK_AHEAD_YARDS = 8;
+const PUTT_CAMERA_BACK_YARDS = 7.5;
 const PUTT_CAMERA_SIDE_YARDS = 0.7;
-const PUTT_CAMERA_EYE_HEIGHT_YARDS = 3.1;
-const PUTT_CAMERA_LOOK_AHEAD_YARDS = 12;
+const PUTT_CAMERA_EYE_HEIGHT_YARDS = 5.5;
+const PUTT_CAMERA_LOOK_AHEAD_YARDS = 4;
 const BALL_RADIUS_YARDS = 0.045;
 const AIM_ARC_DOT_COUNT = 32;
 const AIM_ARC_DOT_RADIUS_YARDS = 0.18;
@@ -50,6 +56,8 @@ export function GolfCourseMap(props: {
   ballSink01: number;
   cameraMode: GolfCameraMode;
   flyoverProgress01: number;
+  isShotInFlight: boolean;
+  ballHeightYards: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<GolfScene | null>(null);
@@ -67,7 +75,8 @@ export function GolfCourseMap(props: {
     golfScene.drawHole(viewRef.current.courseHole);
 
     const onResize = () => golfScene.resize();
-    window.addEventListener("resize", onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(canvas);
 
     let frame = 0;
     const tick = () => {
@@ -79,7 +88,7 @@ export function GolfCourseMap(props: {
 
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", onResize);
+      resizeObserver.disconnect();
       golfScene.dispose();
       sceneRef.current = null;
     };
@@ -93,7 +102,7 @@ export function GolfCourseMap(props: {
     <canvas
       ref={canvasRef}
       className="golf-canvas"
-      aria-label={`Hole ${props.courseHole.holeNumber} three.js course map`}
+      aria-label={`Hole ${props.courseHole.holeNumber} golf course`}
     />
   );
 }
@@ -117,6 +126,8 @@ type GolfScene = {
     ballSink01: number;
     cameraMode: GolfCameraMode;
     flyoverProgress01: number;
+    isShotInFlight: boolean;
+    ballHeightYards: number;
   }) => void;
   resize: () => void;
   dispose: () => void;
@@ -132,55 +143,19 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
   renderer.setClearColor(NAVY, 1);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(NAVY, 260, 920);
-
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.08, 2000);
-
-  scene.add(new THREE.AmbientLight(0xb8d4ff, 0.62));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
-  sun.position.set(90, 180, -50);
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight(ECM_BLUE, 0.4);
-  fill.position.set(-70, 50, 90);
-  scene.add(fill);
-
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      COURSE_WORLD_WIDTH_YARDS + 80,
-      COURSE_WORLD_DEPTH_YARDS + 80,
-    ),
-    new THREE.MeshLambertMaterial({ color: ROUGH }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(
-    COURSE_WORLD_WIDTH_YARDS / 2,
-    -0.05,
-    COURSE_WORLD_DEPTH_YARDS / 2,
-  );
-  scene.add(ground);
-
-  const grid = new THREE.GridHelper(
+  const camera = new THREE.PerspectiveCamera(56, 1, 0.05, 2200);
+  addCourseEnvironment(
+    scene,
+    renderer,
+    "parkland",
+    COURSE_WORLD_WIDTH_YARDS,
     COURSE_WORLD_DEPTH_YARDS,
-    56,
-    WHITE,
-    0x6f93b8,
   );
-  grid.position.set(
-    COURSE_WORLD_WIDTH_YARDS / 2,
-    0.02,
-    COURSE_WORLD_DEPTH_YARDS / 2,
+  const cameraSmoothing = createCameraSmoothing(camera);
+  const shotEffects = createShotEffects(scene, 0xffecc1);
+  const motionPreference = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
   );
-  const gridMaterial = grid.material;
-  if (Array.isArray(gridMaterial)) {
-    gridMaterial.forEach((material) => {
-      material.transparent = true;
-      material.opacity = 0.18;
-    });
-  } else {
-    gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.18;
-  }
-  scene.add(grid);
 
   const holeGroup = new THREE.Group();
   scene.add(holeGroup);
@@ -214,6 +189,8 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
   scene.add(flagGroup);
 
   const drawHole = (courseHole: CourseHole) => {
+    shotEffects.reset();
+    cameraSmoothing.reset();
     while (holeGroup.children.length > 0) {
       const child = holeGroup.children[0];
       holeGroup.remove(child);
@@ -225,27 +202,16 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
       disposeObject(child);
     }
 
-    const path = sampledFairwayPath(courseHole, 16);
-    for (let index = 0; index < path.length - 1; index += 1) {
-      holeGroup.add(
-        fairwaySegment(
-          path[index],
-          path[index + 1],
-          courseHole.fairwayHalfWidthYards,
-        ),
-      );
-      holeGroup.add(
-        surfaceDisc(
-          {
-            center: path[index],
-            radiusYards: courseHole.fairwayHalfWidthYards,
-          },
-          FAIRWAY,
-          0.04,
-          0.88,
-        ),
-      );
-    }
+    const path = sampledFairwayPath(courseHole, 48);
+    holeGroup.add(
+      createFairway(path, courseHole.fairwayHalfWidthYards, "parkland"),
+    );
+    holeGroup.add(
+      createFairwayFringe(path, courseHole.fairwayHalfWidthYards, "parkland", [
+        ...courseHole.waters,
+        ...courseHole.sands,
+      ]),
+    );
     holeGroup.add(
       surfaceDisc(
         {
@@ -254,43 +220,55 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
         },
         FAIRWAY,
         0.04,
-        0.88,
+        1,
       ),
     );
-
-    for (const water of courseHole.waters) {
+    for (const water of courseHole.waters)
+      holeGroup.add(createWater(water, "parkland"));
+    for (const sand of courseHole.sands) {
       holeGroup.add(
         surfaceDisc(
-          {
-            center: water.center,
-            radiusYards: water.radiusYards + 2.2,
-          },
-          WATER_RIM,
-          0.05,
+          { center: sand.center, radiusYards: sand.radiusYards + 0.6 },
+          0x657344,
+          0.06,
           1,
         ),
       );
-      holeGroup.add(surfaceDisc(water, WATER, 0.07, 0.96));
-    }
-    for (const sand of courseHole.sands) {
       holeGroup.add(surfaceDisc(sand, SAND, 0.08, 1));
     }
 
-    holeGroup.add(undulatingGreenMesh(courseHole, COLLAR, courseHole.greenRadiusYards + 3.5, 36));
-    holeGroup.add(undulatingGreenMesh(courseHole, GREEN, courseHole.greenRadiusYards, 48));
-    holeGroup.add(greenSlopeGrid(courseHole));
+    holeGroup.add(
+      undulatingGreenMesh(
+        courseHole,
+        COLLAR,
+        courseHole.greenRadiusYards + 3.5,
+        36,
+      ),
+    );
+    holeGroup.add(
+      undulatingGreenMesh(courseHole, GREEN, courseHole.greenRadiusYards, 48),
+    );
+    const slopeGrid = greenSlopeGrid(courseHole);
+    slopeGrid.name = "green-slope-grid";
+    holeGroup.add(slopeGrid);
 
-    const cupHeightYards = greenHeightYards(courseHole, courseHole.cup);
+    const cupGeometry = new THREE.CircleGeometry(0.55, 48);
+    cupGeometry.rotateX(-Math.PI / 2);
+    const cupVertices = cupGeometry.attributes.position;
+    for (let index = 0; index < cupVertices.count; index++) {
+      cupVertices.setY(
+        index,
+        greenHeightYards(courseHole, {
+          xYards: courseHole.cup.xYards + cupVertices.getX(index),
+          yYards: courseHole.cup.yYards + cupVertices.getZ(index),
+        }) + 0.125,
+      );
+    }
     const cup = new THREE.Mesh(
-      new THREE.CircleGeometry(0.7, 20),
-      new THREE.MeshLambertMaterial({ color: 0x111111 }),
+      cupGeometry,
+      new THREE.MeshBasicMaterial({ color: 0x101c13 }),
     );
-    cup.rotation.x = -Math.PI / 2;
-    cup.position.set(
-      courseHole.cup.xYards,
-      cupHeightYards + 0.03,
-      courseHole.cup.yYards,
-    );
+    cup.position.set(courseHole.cup.xYards, 0, courseHole.cup.yYards);
     holeGroup.add(cup);
 
     const teeBox = new THREE.Mesh(
@@ -308,8 +286,11 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
     teeMarker.position.set(courseHole.tee.xYards, 0.14, courseHole.tee.yYards);
     holeGroup.add(teeMarker);
 
+    holeGroup.add(
+      createTeeFurniture(courseHole.tee, courseHole.holeNumber, "parkland"),
+    );
     for (const treePoint of courseHole.treePoints) {
-      holeGroup.add(treeAt(treePoint));
+      holeGroup.add(createCourseTree(treePoint, "parkland"));
     }
 
     const pole = new THREE.Mesh(
@@ -320,13 +301,13 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
     flagGroup.add(pole);
 
     const flag = new THREE.Mesh(
-      new THREE.PlaneGeometry(6.2, 3.4),
+      new THREE.PlaneGeometry(4, 2.2, 16, 8),
       new THREE.MeshLambertMaterial({
         color: FLAG,
         side: THREE.DoubleSide,
       }),
     );
-    flag.position.set(3.1, 13.4, 0);
+    flag.position.set(2, 13.4, 0);
     flag.name = "flag-cloth";
     flagGroup.add(flag);
     flagGroup.position.set(
@@ -346,16 +327,27 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
     ballSink01: number;
     cameraMode: GolfCameraMode;
     flyoverProgress01: number;
+    isShotInFlight: boolean;
+    ballHeightYards: number;
   }) => {
+    const seconds = performance.now() / 1000;
+    animateCourseScenery(holeGroup, motionPreference.matches ? 0 : seconds);
     const ballHeightYards = greenHeightYards(view.courseHole, view.ball);
     const sink01 = Math.min(1, Math.max(0, view.ballSink01));
     ballMesh.position.set(
       view.ball.xYards,
-      ballHeightYards + BALL_RADIUS_YARDS - sink01 * 0.55,
+      ballHeightYards +
+        0.1 +
+        view.ballHeightYards +
+        BALL_RADIUS_YARDS * 2.4 -
+        sink01 * 0.55,
       view.ball.yYards,
     );
     const ballScale = 1 - sink01 * 0.85;
-    ballMesh.scale.setScalar(Math.max(0.08, ballScale));
+    ballMesh.scale.setScalar(
+      Math.max(0.08, ballScale) *
+        (view.isShotInFlight && !view.aimIsPutt ? 4 : 2.4),
+    );
     ballMesh.visible = sink01 < 0.98;
     writeAimArcDotTransforms({
       instancedDots: aimArcDots,
@@ -367,14 +359,74 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
       carryYards: view.aimCarryYards,
       isPutt: view.aimIsPutt,
     });
-    aimArcDots.visible = view.cameraMode === "play" && sink01 === 0;
+    aimArcDots.visible =
+      view.cameraMode === "play" && sink01 === 0 && !view.isShotInFlight;
+    const slopeGrid = holeGroup.getObjectByName("green-slope-grid");
+    if (slopeGrid) slopeGrid.visible = view.aimIsPutt && !view.isShotInFlight;
 
-    const flagCloth = flagGroup.getObjectByName("flag-cloth");
+    flagGroup.visible =
+      view.cameraMode !== "play" ||
+      Math.hypot(
+        view.courseHole.cup.xYards - view.ball.xYards,
+        view.courseHole.cup.yYards - view.ball.yYards,
+      ) > 14;
+    const flagCloth = flagGroup.getObjectByName("flag-cloth") as
+      | THREE.Mesh
+      | undefined;
     if (flagCloth) {
       flagCloth.lookAt(camera.position);
+      const vertices = flagCloth.geometry.attributes.position;
+      for (let index = 0; index < vertices.count; index++) {
+        const along = (vertices.getX(index) + 2) / 4;
+        vertices.setZ(
+          index,
+          motionPreference.matches
+            ? 0
+            : Math.sin(seconds * 3.4 - along * 5 + vertices.getY(index)) *
+                along *
+                0.3,
+        );
+      }
+      vertices.needsUpdate = true;
+      flagCloth.geometry.computeVertexNormals();
     }
 
-    if (view.cameraMode === "play" && sink01 > 0) {
+    shotEffects.update(
+      ballMesh.position,
+      ballHeightYards,
+      view.isShotInFlight,
+      sink01 > 0.95,
+      seconds,
+      motionPreference.matches,
+    );
+    if (view.cameraMode === "play" && view.isShotInFlight && view.aimIsPutt) {
+      applyPlayCamera(
+        camera,
+        view.ball,
+        view.aimHeadingDegrees,
+        true,
+        view.courseHole,
+      );
+      camera.fov = 62;
+    } else if (view.cameraMode === "play" && view.isShotInFlight) {
+      const heading = (view.aimHeadingDegrees * Math.PI) / 180;
+      const backYards = view.aimIsPutt ? 5 : 17;
+      camera.position.set(
+        view.ball.xYards -
+          Math.sin(heading) * backYards +
+          Math.cos(heading) * 5,
+        Math.max(5, ballMesh.position.y + 5),
+        view.ball.yYards -
+          Math.cos(heading) * backYards -
+          Math.sin(heading) * 5,
+      );
+      camera.lookAt(
+        ballMesh.position.x,
+        ballMesh.position.y + 0.4,
+        ballMesh.position.z,
+      );
+      camera.fov = 56;
+    } else if (view.cameraMode === "play" && sink01 > 0) {
       applyHoleOutCamera(camera, view.courseHole);
       camera.fov = 50;
     } else if (view.cameraMode === "play") {
@@ -401,6 +453,7 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
       applyPreviewCamera(camera, view.courseHole);
       camera.fov = 50;
     }
+    cameraSmoothing.update(motionPreference.matches);
     camera.updateProjectionMatrix();
   };
 
@@ -434,41 +487,13 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
   };
 }
 
-function fairwaySegment(
-  start: CoursePointYards,
-  end: CoursePointYards,
-  halfWidthYards: number,
-) {
-  const lengthYards = distanceYards(start, end);
-  const heading = Math.atan2(
-    end.xYards - start.xYards,
-    end.yYards - start.yYards,
-  );
-  const ribbon = new THREE.Mesh(
-    new THREE.PlaneGeometry(halfWidthYards * 2, lengthYards),
-    new THREE.MeshLambertMaterial({
-      color: FAIRWAY,
-      transparent: true,
-      opacity: 0.92,
-    }),
-  );
-  ribbon.rotation.x = -Math.PI / 2;
-  ribbon.rotation.z = -heading;
-  ribbon.position.set(
-    (start.xYards + end.xYards) / 2,
-    0.045,
-    (start.yYards + end.yYards) / 2,
-  );
-  return ribbon;
-}
-
 function undulatingGreenMesh(
   courseHole: CourseHole,
   color: number,
   radiusYards: number,
   segments: number,
 ) {
-  const geometry = new THREE.CircleGeometry(radiusYards, segments);
+  const geometry = new THREE.RingGeometry(0, radiusYards, segments, 12);
   geometry.rotateX(-Math.PI / 2);
   const positions = geometry.attributes.position;
   const shades = new Float32Array(positions.count * 3);
@@ -491,13 +516,17 @@ function undulatingGreenMesh(
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geometry,
-    new THREE.MeshLambertMaterial({
-      color: 0xffffff,
+    Object.assign(createTurfMaterial(0xffffff, true), {
       vertexColors: true,
       side: THREE.DoubleSide,
     }),
   );
-  mesh.position.set(courseHole.cup.xYards, 0.1, courseHole.cup.yYards);
+  mesh.receiveShadow = true;
+  mesh.position.set(
+    courseHole.cup.xYards,
+    radiusYards > courseHole.greenRadiusYards ? 0.08 : 0.1,
+    courseHole.cup.yYards,
+  );
   return mesh;
 }
 
@@ -554,19 +583,19 @@ function greenSlopeGrid(courseHole: CourseHole) {
 }
 
 function surfaceDisc(
-  circle: CourseCircle,
+  circle: { center: CoursePointYards; radiusYards: number },
   color: number,
   y: number,
   opacity: number,
 ) {
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(circle.radiusYards, 36),
-    new THREE.MeshLambertMaterial({
-      color,
+    Object.assign(createTurfMaterial(color), {
       transparent: opacity < 1,
       opacity,
     }),
   );
+  disc.receiveShadow = true;
   disc.rotation.x = -Math.PI / 2;
   disc.position.set(circle.center.xYards, y, circle.center.yYards);
   return disc;
@@ -674,7 +703,7 @@ function applyPlayCamera(
   );
   camera.lookAt(
     lookPoint.xYards,
-    isPutt ? greenHeightYards(courseHole, lookPoint) + 0.15 : 2.8,
+    isPutt ? greenHeightYards(courseHole, lookPoint) + 0.15 : 0.6,
     lookPoint.yYards,
   );
 }
@@ -741,7 +770,7 @@ function applyPreviewCamera(
   const mid = path[Math.floor(path.length / 2)];
   camera.position.set(
     courseHole.tee.xYards + side.x * 36 - 8,
-    72,
+    52,
     courseHole.tee.yYards + side.z * 36 - 18,
   );
   camera.lookAt(mid.xYards, 0, mid.yYards);
@@ -772,38 +801,4 @@ function smoothstep01(value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function treeAt(point: CoursePointYards) {
-  const scale =
-    0.82 +
-    (Math.abs(Math.sin(point.xYards * 0.37 + point.yYards * 0.19)) * 0.45);
-  const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.55, 0.75, 5.5, 6),
-    new THREE.MeshLambertMaterial({ color: TREE_TRUNK }),
-  );
-  trunk.position.y = 2.75;
-  const foliage = new THREE.Mesh(
-    new THREE.ConeGeometry(4.2, 11, 7),
-    new THREE.MeshLambertMaterial({ color: TREE_LEAF }),
-  );
-  foliage.position.y = 10.2;
-  tree.add(trunk, foliage);
-  tree.position.set(point.xYards, 0, point.yYards);
-  tree.scale.set(scale, scale, scale);
-  return tree;
-}
-
-function disposeObject(object: THREE.Object3D) {
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.geometry) {
-      mesh.geometry.dispose();
-    }
-    const material = mesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((entry) => entry.dispose());
-    } else if (material) {
-      material.dispose();
-    }
-  });
-}
+const disposeObject = disposeCourseObject;

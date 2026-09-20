@@ -1,12 +1,8 @@
-import { DiscSelectorReel } from "./DiscSelectorReel";
+import { CoursePlayerInterface } from "../course-visuals/CoursePlayerInterface";
 import { ThrowBendMeter } from "./ThrowBendMeter";
-import type { DiscId } from "./discGolfDiscs";
+import { discById, type DiscId } from "./discGolfDiscs";
 import { COURSE_NAME, type CourseHole } from "./discGolfCourse";
-import {
-  compassPointFromHeadingDegrees,
-  type CourseWind,
-} from "./discGolfWind";
-
+import type { CourseWind } from "./discGolfWind";
 export type DiscGolfPlayMode = "direction" | "throw";
 
 export type DiscGolfThrowBanner = {
@@ -34,105 +30,78 @@ export function DiscGolfPlayerDashboard(props: {
   throwBanner: DiscGolfThrowBanner | null;
   onSelectDirectionMode: () => void;
   onSelectThrowMode: () => void;
+  position: { xYards: number; yYards: number };
+  headingDegrees: number;
+  isInFlight: boolean;
+  isComplete: boolean;
+  onPreviousEquipment: () => void;
+  onNextEquipment: () => void;
+  onAimLeft: () => void;
+  onAimRight: () => void;
+  onCharge: () => void;
+  onRelease: () => void;
+  onCancelCharge: () => void;
 }) {
-  const scoreLabel =
-    props.completedHoleCount === 0
-      ? "E"
-      : `${props.scoreVsPar > 0 ? "+" : ""}${props.scoreVsPar}`;
-  const windSpeedMph = Math.round(props.courseWind.speedMph);
-  const windPoint = compassPointFromHeadingDegrees(
-    props.courseWind.blowToHeadingDegrees,
-  );
-
+  const equipment = discById(props.selectedDiscId);
+  const result = props.throwBanner;
   return (
-    <div className="golf-hud">
-      <div className="golf-hud-mode">
-        <div className="golf-mode-switch" role="group" aria-label="Play mode">
-          <button
-            type="button"
-            className={
-              props.playMode === "direction"
-                ? "golf-mode-button is-active"
-                : "golf-mode-button"
+    <CoursePlayerInterface
+      sport="disc-golf"
+      courseName={COURSE_NAME}
+      holeName={props.courseHole.name}
+      holeNumber={props.courseHole.holeNumber}
+      par={props.courseHole.par}
+      playerName={props.playerName}
+      scoreLabel={
+        props.scoreVsPar === 0
+          ? "E"
+          : `${props.scoreVsPar > 0 ? "+" : ""}${props.scoreVsPar}`
+      }
+      strokes={props.throwsThisHole}
+      totalStrokes={props.totalThrows}
+      distanceYards={props.yardsToBasket}
+      lieLabel={props.lieLabel}
+      message={props.operatorMessage}
+      power={props.throwPower}
+      isInFlight={props.isInFlight}
+      isComplete={props.isComplete}
+      isAiming={props.playMode === "direction"}
+      windSpeedMph={Math.round(props.courseWind.speedMph)}
+      windHeadingDegrees={props.courseWind.blowToHeadingDegrees}
+      equipmentName={equipment.name}
+      equipmentDetail={`${equipment.carryYards} yd carry · [ ] to change`}
+      canChangeEquipment={true}
+      onPreviousEquipment={props.onPreviousEquipment}
+      onNextEquipment={props.onNextEquipment}
+      onAim={props.onSelectDirectionMode}
+      onPrepareShot={props.onSelectThrowMode}
+      onAimLeft={props.onAimLeft}
+      onAimRight={props.onAimRight}
+      onCharge={props.onCharge}
+      onRelease={props.onRelease}
+      onCancelCharge={props.onCancelCharge}
+      tee={props.courseHole.tee}
+      target={props.courseHole.basket}
+      position={props.position}
+      fairwayWaypoints={props.courseHole.fairwayWaypoints}
+      waters={props.courseHole.waters}
+      headingDegrees={props.headingDegrees}
+      bendMeter={
+        <ThrowBendMeter
+          throwPower={props.throwPower}
+          throwHyzer01={props.throwHyzer01}
+        />
+      }
+      result={
+        result
+          ? {
+              key: result.bannerKey,
+              powerPercent: result.powerPercent,
+              travelYards: result.travelYards,
+              detail: result.hyzerLabel,
             }
-            onClick={props.onSelectDirectionMode}
-          >
-            Direction
-          </button>
-          <button
-            type="button"
-            className={
-              props.playMode === "throw"
-                ? "golf-mode-button is-active"
-                : "golf-mode-button"
-            }
-            onClick={props.onSelectThrowMode}
-          >
-            Throw
-          </button>
-        </div>
-        <DiscSelectorReel selectedDiscId={props.selectedDiscId} />
-      </div>
-
-      <div
-        className="golf-hud-wind"
-        aria-label={`${windSpeedMph} mph ${windPoint}`}
-      >
-        <div className="golf-wind-rose">
-          <span
-            className="golf-wind-needle"
-            style={{
-              transform: `rotate(${props.courseWind.blowToHeadingDegrees}deg)`,
-            }}
-          />
-          <span className="golf-wind-hub">
-            {windSpeedMph}
-            <small>mph</small>
-          </span>
-        </div>
-      </div>
-
-      <ThrowBendMeter
-        throwPower={props.throwPower}
-        throwHyzer01={props.throwHyzer01}
-      />
-
-      <div className="golf-hud-score">
-        <p className="golf-dash-kicker">
-          {COURSE_NAME} · {props.playerName}
-        </p>
-        <p className="golf-score-hole">
-          Hole {props.courseHole.holeNumber}
-          <span>
-            Par {props.courseHole.par} · throw {props.throwsThisHole}
-          </span>
-        </p>
-        <div className="golf-dash-meters">
-          <p className="golf-meter-value">
-            {Math.round(props.yardsToBasket)}
-            <small>yd</small>
-          </p>
-          <p className="golf-meter-value">
-            {scoreLabel}
-            <small>{props.totalThrows} total</small>
-          </p>
-        </div>
-        <p className="golf-lie-label">{props.lieLabel}</p>
-        {props.operatorMessage ? (
-          <p className="golf-score-note">{props.operatorMessage}</p>
-        ) : null}
-      </div>
-
-      {props.throwBanner ? (
-        <div key={props.throwBanner.bannerKey} className="golf-shot-banner">
-          <p className="golf-shot-banner-power">
-            {props.throwBanner.powerPercent}% · {props.throwBanner.hyzerLabel}
-          </p>
-          <p className="golf-shot-banner-distance">
-            {props.throwBanner.travelYards} yd
-          </p>
-        </div>
-      ) : null}
-    </div>
+          : null
+      }
+    />
   );
 }

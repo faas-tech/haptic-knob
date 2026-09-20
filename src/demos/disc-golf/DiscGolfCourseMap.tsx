@@ -1,11 +1,25 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import {
+  addCourseEnvironment,
+  animateCourseScenery,
+  createCourseTree,
+  createCircuitLights,
+  createFairway,
+  createFairwayFringe,
+  createTeeFurniture,
+  createTurfMaterial,
+  createWater,
+  disposeCourseObject,
+} from "../course-visuals/courseScenery";
+import {
+  createCameraSmoothing,
+  createShotEffects,
+} from "../course-visuals/shotEffects";
+import {
   COURSE_WORLD_DEPTH_YARDS,
   COURSE_WORLD_WIDTH_YARDS,
-  distanceYards,
   sampledFairwayPath,
-  type CourseCircle,
   type CourseHole,
   type CoursePointYards,
 } from "./discGolfCourse";
@@ -13,16 +27,12 @@ import type { FlightPointYards } from "./discGolfThrow";
 
 const BLACK = 0x050508;
 const WHITE = 0xffffff;
-const CYAN = 0x2de2e6;
-const MAGENTA = 0xff2bd6;
 const LIME = 0xb6ff3b;
-const WATER = 0x3d5cff;
-const FAIRWAY = 0x1a9a9c;
-const FEET_PER_YARD = 3;
-const PLAY_CAMERA_BACK_YARDS = 10 / FEET_PER_YARD;
+const FAIRWAY = 0x378c7d;
+const PLAY_CAMERA_BACK_YARDS = 13;
 const PLAY_CAMERA_SIDE_YARDS = 1.2;
-const PLAY_CAMERA_EYE_HEIGHT_YARDS = 5.8 / FEET_PER_YARD;
-const PLAY_CAMERA_LOOK_AHEAD_YARDS = 32;
+const PLAY_CAMERA_EYE_HEIGHT_YARDS = 7;
+const PLAY_CAMERA_LOOK_AHEAD_YARDS = 18;
 const DISC_RADIUS_YARDS = 0.32;
 const AIM_ARC_DOT_COUNT = 22;
 const AIM_DOT_RADIUS_YARDS = 0.07;
@@ -40,6 +50,7 @@ export function DiscGolfCourseMap(props: {
   discSink01: number;
   cameraMode: DiscGolfCameraMode;
   flyoverProgress01: number;
+  isShotInFlight: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<DiscGolfScene | null>(null);
@@ -55,7 +66,8 @@ export function DiscGolfCourseMap(props: {
     sceneRef.current = discGolfScene;
     discGolfScene.drawHole(viewRef.current.courseHole);
     const onResize = () => discGolfScene.resize();
-    window.addEventListener("resize", onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(canvas);
     let frame = 0;
     const tick = () => {
       discGolfScene.syncView(viewRef.current);
@@ -65,7 +77,7 @@ export function DiscGolfCourseMap(props: {
     frame = window.requestAnimationFrame(tick);
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", onResize);
+      resizeObserver.disconnect();
       discGolfScene.dispose();
       sceneRef.current = null;
     };
@@ -105,6 +117,7 @@ type DiscGolfScene = {
     discSink01: number;
     cameraMode: DiscGolfCameraMode;
     flyoverProgress01: number;
+    isShotInFlight: boolean;
   }) => void;
   resize: () => void;
   dispose: () => void;
@@ -120,54 +133,19 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
   renderer.setClearColor(BLACK, 1);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(BLACK, 160, 520);
-
-  const camera = new THREE.PerspectiveCamera(62, 1, 0.08, 2000);
-  scene.add(new THREE.AmbientLight(0x6a7cff, 0.55));
-  const key = new THREE.DirectionalLight(CYAN, 0.85);
-  key.position.set(40, 120, -30);
-  scene.add(key);
-  const fill = new THREE.DirectionalLight(MAGENTA, 0.45);
-  fill.position.set(-80, 40, 70);
-  scene.add(fill);
-
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(
-      COURSE_WORLD_WIDTH_YARDS + 80,
-      COURSE_WORLD_DEPTH_YARDS + 80,
-    ),
-    new THREE.MeshLambertMaterial({ color: 0x101018 }),
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(
-    COURSE_WORLD_WIDTH_YARDS / 2,
-    -0.05,
-    COURSE_WORLD_DEPTH_YARDS / 2,
-  );
-  scene.add(ground);
-
-  const grid = new THREE.GridHelper(
+  const camera = new THREE.PerspectiveCamera(56, 1, 0.05, 2200);
+  addCourseEnvironment(
+    scene,
+    renderer,
+    "twilight",
+    COURSE_WORLD_WIDTH_YARDS,
     COURSE_WORLD_DEPTH_YARDS,
-    40,
-    CYAN,
-    0x2a2a55,
   );
-  grid.position.set(
-    COURSE_WORLD_WIDTH_YARDS / 2,
-    0.02,
-    COURSE_WORLD_DEPTH_YARDS / 2,
+  const cameraSmoothing = createCameraSmoothing(camera);
+  const shotEffects = createShotEffects(scene, 0x79ffe5);
+  const motionPreference = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
   );
-  const gridMaterial = grid.material;
-  if (Array.isArray(gridMaterial)) {
-    gridMaterial.forEach((material) => {
-      material.transparent = true;
-      material.opacity = 0.38;
-    });
-  } else {
-    gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.38;
-  }
-  scene.add(grid);
 
   const holeGroup = new THREE.Group();
   scene.add(holeGroup);
@@ -181,6 +159,13 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
       metalness: 0.28,
     }),
   );
+  const discStripe = new THREE.Mesh(
+    new THREE.RingGeometry(0.16, 0.22, 32, 1, 0, Math.PI * 1.45),
+    new THREE.MeshBasicMaterial({ color: 0x153c45, side: THREE.DoubleSide }),
+  );
+  discStripe.rotation.x = -Math.PI / 2;
+  discStripe.position.y = 0.032;
+  discMesh.add(discStripe);
   scene.add(discMesh);
 
   const aimDotDummy = new THREE.Object3D();
@@ -192,6 +177,8 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
   scene.add(basketGroup);
 
   const drawHole = (courseHole: CourseHole) => {
+    shotEffects.reset();
+    cameraSmoothing.reset();
     while (holeGroup.children.length > 0) {
       const child = holeGroup.children[0];
       holeGroup.remove(child);
@@ -203,16 +190,19 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
       disposeObject(child);
     }
 
-    const path = sampledFairwayPath(courseHole, 14);
-    for (let index = 0; index < path.length - 1; index += 1) {
-      holeGroup.add(
-        fairwaySegment(
-          path[index],
-          path[index + 1],
-          courseHole.fairwayHalfWidthYards,
-        ),
-      );
-    }
+    const path = sampledFairwayPath(courseHole, 48);
+    holeGroup.add(
+      createFairway(path, courseHole.fairwayHalfWidthYards, "twilight"),
+    );
+    holeGroup.add(
+      createFairwayFringe(
+        path,
+        courseHole.fairwayHalfWidthYards,
+        "twilight",
+        courseHole.waters,
+      ),
+    );
+    holeGroup.add(createCircuitLights(path, courseHole.fairwayHalfWidthYards));
     holeGroup.add(
       surfaceDisc(
         {
@@ -220,26 +210,31 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
           radiusYards: courseHole.basketPadRadiusYards,
         },
         FAIRWAY,
-        0.06,
-        0.95,
-      ),
-    );
-    holeGroup.add(
-      surfaceDisc(
-        {
-          center: courseHole.basket,
-          radiusYards: courseHole.basketPadRadiusYards,
-        },
-        LIME,
         0.07,
-        0.18,
+        1,
       ),
     );
-
-    for (const water of courseHole.waters) {
-      holeGroup.add(surfaceDisc(water, WATER, 0.05, 0.72));
-    }
-
+    const targetRing = new THREE.Mesh(
+      new THREE.RingGeometry(
+        courseHole.basketPadRadiusYards - 0.08,
+        courseHole.basketPadRadiusYards,
+        80,
+      ),
+      new THREE.MeshBasicMaterial({
+        color: LIME,
+        transparent: true,
+        opacity: 0.55,
+      }),
+    );
+    targetRing.rotation.x = -Math.PI / 2;
+    targetRing.position.set(
+      courseHole.basket.xYards,
+      0.08,
+      courseHole.basket.yYards,
+    );
+    holeGroup.add(targetRing);
+    for (const water of courseHole.waters)
+      holeGroup.add(createWater(water, "twilight"));
     const teeBox = new THREE.Mesh(
       new THREE.PlaneGeometry(3.2, 2.2),
       new THREE.MeshBasicMaterial({ color: WHITE }),
@@ -248,8 +243,11 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
     teeBox.position.set(courseHole.tee.xYards, 0.1, courseHole.tee.yYards);
     holeGroup.add(teeBox);
 
+    holeGroup.add(
+      createTeeFurniture(courseHole.tee, courseHole.holeNumber, "twilight"),
+    );
     for (const treePoint of courseHole.treePoints) {
-      holeGroup.add(neonTreeAt(treePoint));
+      holeGroup.add(createCourseTree(treePoint, "twilight"));
     }
 
     basketGroup.add(buildDiscGolfTarget());
@@ -271,17 +269,26 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
     discSink01: number;
     cameraMode: DiscGolfCameraMode;
     flyoverProgress01: number;
+    isShotInFlight: boolean;
   }) => {
+    const seconds = performance.now() / 1000;
+    animateCourseScenery(holeGroup, motionPreference.matches ? 0 : seconds);
     const sink01 = Math.min(1, Math.max(0, view.discSink01));
     discMesh.position.set(
       view.disc.xYards,
-      Math.max(0.08, view.discHeightYards) - sink01 * 1.4,
+      Math.max(0.08, view.discHeightYards) - sink01 * 1.1,
       view.disc.yYards,
     );
-    discMesh.rotation.y += 0.08;
+    discMesh.rotation.y = motionPreference.matches
+      ? 0
+      : seconds * (view.isShotInFlight ? 14 : 0.5);
+    discMesh.rotation.z = view.isShotInFlight
+      ? Math.sin(seconds * 2) * 0.12
+      : 0;
     discMesh.scale.setScalar(Math.max(0.12, 1 - sink01 * 0.8));
     discMesh.visible = sink01 < 0.98;
-    const showAim = view.cameraMode === "play" && sink01 === 0;
+    const showAim =
+      view.cameraMode === "play" && sink01 === 0 && !view.isShotInFlight;
     const showHyzer =
       showAim &&
       (view.visibleAimSide === "both" || view.visibleAimSide === "hyzer");
@@ -301,7 +308,33 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
     hyzerAimDots.visible = showHyzer;
     anhyzerAimDots.visible = showAnhyzer;
 
-    if (view.cameraMode === "play" && sink01 > 0) {
+    shotEffects.update(
+      discMesh.position,
+      0,
+      view.isShotInFlight,
+      sink01 > 0.95,
+      seconds,
+      motionPreference.matches,
+    );
+    if (view.cameraMode === "play" && view.isShotInFlight) {
+      const heading = (view.aimHeadingDegrees * Math.PI) / 180;
+      const backYards = 12;
+      camera.position.set(
+        view.disc.xYards -
+          Math.sin(heading) * backYards +
+          Math.cos(heading) * 5,
+        Math.max(5, discMesh.position.y + 5),
+        view.disc.yYards -
+          Math.cos(heading) * backYards -
+          Math.sin(heading) * 5,
+      );
+      camera.lookAt(
+        discMesh.position.x,
+        discMesh.position.y + 0.4,
+        discMesh.position.z,
+      );
+      camera.fov = 56;
+    } else if (view.cameraMode === "play" && sink01 > 0) {
       applyBasketCamera(camera, view.courseHole);
       camera.fov = 50;
     } else if (view.cameraMode === "play") {
@@ -322,6 +355,7 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
       applyPreviewCamera(camera, view.courseHole);
       camera.fov = 50;
     }
+    cameraSmoothing.update(motionPreference.matches);
     camera.updateProjectionMatrix();
   };
 
@@ -356,65 +390,20 @@ function createDiscGolfScene(canvas: HTMLCanvasElement): DiscGolfScene {
   };
 }
 
-function fairwaySegment(
-  start: CoursePointYards,
-  end: CoursePointYards,
-  halfWidthYards: number,
-) {
-  const lengthYards = distanceYards(start, end);
-  const heading = Math.atan2(
-    end.xYards - start.xYards,
-    end.yYards - start.yYards,
-  );
-  const ribbon = new THREE.Mesh(
-    new THREE.PlaneGeometry(halfWidthYards * 2, lengthYards),
-    new THREE.MeshLambertMaterial({
-      color: FAIRWAY,
-      transparent: true,
-      opacity: 0.94,
-    }),
-  );
-  ribbon.rotation.x = -Math.PI / 2;
-  ribbon.rotation.z = -heading;
-  ribbon.position.set(
-    (start.xYards + end.xYards) / 2,
-    0.045,
-    (start.yYards + end.yYards) / 2,
-  );
-  const edge = new THREE.Mesh(
-    new THREE.PlaneGeometry(halfWidthYards * 2 + 0.7, lengthYards),
-    new THREE.MeshBasicMaterial({
-      color: CYAN,
-      transparent: true,
-      opacity: 0.28,
-    }),
-  );
-  edge.rotation.x = -Math.PI / 2;
-  edge.rotation.z = -heading;
-  edge.position.set(
-    (start.xYards + end.xYards) / 2,
-    0.03,
-    (start.yYards + end.yYards) / 2,
-  );
-  const group = new THREE.Group();
-  group.add(edge, ribbon);
-  return group;
-}
-
 function surfaceDisc(
-  circle: CourseCircle,
+  circle: { center: CoursePointYards; radiusYards: number },
   color: number,
   y: number,
   opacity: number,
 ) {
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(circle.radiusYards, 36),
-    new THREE.MeshLambertMaterial({
-      color,
+    Object.assign(createTurfMaterial(color), {
       transparent: opacity < 1,
       opacity,
     }),
   );
+  disc.receiveShadow = true;
   disc.rotation.x = -Math.PI / 2;
   disc.position.set(circle.center.xYards, y, circle.center.yYards);
   return disc;
@@ -462,9 +451,23 @@ function writeAimPathDots(
 
 function buildDiscGolfTarget() {
   const target = new THREE.Group();
-  const steel = new THREE.MeshLambertMaterial({ color: 0xc8cfd6 });
-  const chainSteel = new THREE.MeshLambertMaterial({ color: 0xd8dde3 });
-  const band = new THREE.MeshBasicMaterial({ color: 0xe8f25c });
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0xd2dee1,
+    metalness: 0.75,
+    roughness: 0.24,
+  });
+  const chainSteel = new THREE.MeshStandardMaterial({
+    color: 0xcbdadb,
+    metalness: 0.7,
+    roughness: 0.3,
+  });
+  const band = new THREE.MeshStandardMaterial({
+    color: 0xddfb9a,
+    emissive: 0xa7ef6e,
+    emissiveIntensity: 0.45,
+    metalness: 0.4,
+    roughness: 0.3,
+  });
   const trayFloor = new THREE.MeshBasicMaterial({ color: 0xd4de46 });
 
   const pole = new THREE.Mesh(
@@ -474,12 +477,18 @@ function buildDiscGolfTarget() {
   pole.position.y = 2.98;
   target.add(pole);
 
-  const topRing = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.07, 10, 28), band);
+  const topRing = new THREE.Mesh(
+    new THREE.TorusGeometry(1.08, 0.07, 10, 28),
+    band,
+  );
   topRing.rotation.x = Math.PI / 2;
   topRing.position.y = 5.18;
   target.add(topRing);
 
-  const trayRim = new THREE.Mesh(new THREE.TorusGeometry(1.12, 0.075, 10, 28), band);
+  const trayRim = new THREE.Mesh(
+    new THREE.TorusGeometry(1.12, 0.075, 10, 28),
+    band,
+  );
   trayRim.rotation.x = Math.PI / 2;
   trayRim.position.y = 2.9;
   target.add(trayRim);
@@ -491,7 +500,10 @@ function buildDiscGolfTarget() {
   trayWall.position.y = 2.68;
   target.add(trayWall);
 
-  const trayBottom = new THREE.Mesh(new THREE.CircleGeometry(1.0, 24), trayFloor);
+  const trayBottom = new THREE.Mesh(
+    new THREE.CircleGeometry(1.0, 24),
+    trayFloor,
+  );
   trayBottom.rotation.x = -Math.PI / 2;
   trayBottom.position.y = 2.47;
   target.add(trayBottom);
@@ -541,6 +553,15 @@ function buildDiscGolfTarget() {
   flag.position.set(0.28, 6.48, 0);
   target.add(flag);
 
+  const topBand = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.09, 1.09, 0.3, 48, 1, true),
+    band,
+  );
+  topBand.position.y = 5.17;
+  target.add(topBand);
+  target.traverse((object) => {
+    if (object instanceof THREE.Mesh) object.castShadow = true;
+  });
   target.scale.setScalar(1.25);
   return target;
 }
@@ -570,11 +591,11 @@ function applyBasketCamera(
   courseHole: CourseHole,
 ) {
   camera.position.set(
-    courseHole.basket.xYards + 3.6,
-    3.2,
-    courseHole.basket.yYards - 5.2,
+    courseHole.basket.xYards + 8,
+    6,
+    courseHole.basket.yYards - 11,
   );
-  camera.lookAt(courseHole.basket.xYards, 1.2, courseHole.basket.yYards);
+  camera.lookAt(courseHole.basket.xYards, 3.5, courseHole.basket.yYards);
 }
 
 function applyPlayCamera(
@@ -586,13 +607,17 @@ function applyPlayCamera(
   const alongX = Math.sin(headingRadians);
   const alongZ = Math.cos(headingRadians);
   camera.position.set(
-    disc.xYards - alongX * PLAY_CAMERA_BACK_YARDS + alongZ * PLAY_CAMERA_SIDE_YARDS,
+    disc.xYards -
+      alongX * PLAY_CAMERA_BACK_YARDS +
+      alongZ * PLAY_CAMERA_SIDE_YARDS,
     PLAY_CAMERA_EYE_HEIGHT_YARDS,
-    disc.yYards - alongZ * PLAY_CAMERA_BACK_YARDS - alongX * PLAY_CAMERA_SIDE_YARDS,
+    disc.yYards -
+      alongZ * PLAY_CAMERA_BACK_YARDS -
+      alongX * PLAY_CAMERA_SIDE_YARDS,
   );
   camera.lookAt(
     disc.xYards + alongX * PLAY_CAMERA_LOOK_AHEAD_YARDS,
-    2.4,
+    0.6,
     disc.yYards + alongZ * PLAY_CAMERA_LOOK_AHEAD_YARDS,
   );
 }
@@ -647,7 +672,7 @@ function applyPreviewCamera(
   const side = sideOffsetForHole(courseHole);
   camera.position.set(
     courseHole.tee.xYards + side.x * 32,
-    58,
+    24,
     courseHole.tee.yYards + side.z * 32 - 16,
   );
   camera.lookAt(courseHole.basket.xYards, 0, courseHole.basket.yYards);
@@ -678,38 +703,4 @@ function smoothstep01(value: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function neonTreeAt(point: CoursePointYards) {
-  const scale =
-    0.82 +
-    Math.abs(Math.sin(point.xYards * 0.37 + point.yYards * 0.19)) * 0.4;
-  const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.35, 0.5, 4.4, 6),
-    new THREE.MeshBasicMaterial({ color: 0x1a1024 }),
-  );
-  trunk.position.y = 2.2;
-  const foliage = new THREE.Mesh(
-    new THREE.ConeGeometry(3.4, 9, 6),
-    new THREE.MeshBasicMaterial({ color: MAGENTA }),
-  );
-  foliage.position.y = 8.2;
-  tree.add(trunk, foliage);
-  tree.position.set(point.xYards, 0, point.yYards);
-  tree.scale.set(scale, scale, scale);
-  return tree;
-}
-
-function disposeObject(object: THREE.Object3D) {
-  object.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (mesh.geometry) {
-      mesh.geometry.dispose();
-    }
-    const material = mesh.material;
-    if (Array.isArray(material)) {
-      material.forEach((entry) => entry.dispose());
-    } else if (material) {
-      material.dispose();
-    }
-  });
-}
+const disposeObject = disposeCourseObject;

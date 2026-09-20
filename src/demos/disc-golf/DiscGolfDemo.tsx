@@ -1,3 +1,4 @@
+import { holeScoreName } from "../course-visuals/CoursePlayerInterface";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   applyHapticMode,
@@ -8,7 +9,10 @@ import {
   type KnobStreamSample,
 } from "../../sdk";
 import type { DiscGolfHeaderActionsState } from "../../ui/DiscGolfHeaderActions";
-import { DiscGolfCourseMap, type DiscGolfCameraMode } from "./DiscGolfCourseMap";
+import {
+  DiscGolfCourseMap,
+  type DiscGolfCameraMode,
+} from "./DiscGolfCourseMap";
 import { DiscGolfHoleIntro } from "./DiscGolfHoleIntro";
 import { DiscGolfNameScreen } from "./DiscGolfNameScreen";
 import {
@@ -53,7 +57,11 @@ const HOLE_FLYOVER_MS = 5000;
 const HOLE_OUT_SINK_MS = 620;
 const HOLE_OUT_HOLD_MS = 1800;
 
-type DiscGolfRoundPhase = "enter-name" | "hole-flyover" | "play" | "round-results";
+type DiscGolfRoundPhase =
+  | "enter-name"
+  | "hole-flyover"
+  | "play"
+  | "round-results";
 
 export function DiscGolfDemo(props: {
   isConnected: boolean;
@@ -62,9 +70,14 @@ export function DiscGolfDemo(props: {
   onHeaderActionsChange: (actions: DiscGolfHeaderActionsState | null) => void;
 }) {
   const [holeNumber, setHoleNumber] = useState(holeNumberFromSearch);
-  const courseHole = useMemo(() => courseHoleByNumber(holeNumber), [holeNumber]);
+  const courseHole = useMemo(
+    () => courseHoleByNumber(holeNumber),
+    [holeNumber],
+  );
   const [lie, setLie] = useState<CoursePointYards>(courseHole.tee);
-  const [lastSafeLie, setLastSafeLie] = useState<CoursePointYards>(courseHole.tee);
+  const [lastSafeLie, setLastSafeLie] = useState<CoursePointYards>(
+    courseHole.tee,
+  );
   const [headingDegrees, setHeadingDegrees] = useState(() =>
     headingDegreesToBasket(courseHole.tee, courseHole.basket),
   );
@@ -82,14 +95,18 @@ export function DiscGolfDemo(props: {
   const [isRoundComplete, setIsRoundComplete] = useState(false);
   const [isMotorEnabled, setIsMotorEnabled] = useState(false);
   const [operatorMessage, setOperatorMessage] = useState("");
-  const [throwBanner, setThrowBanner] = useState<DiscGolfThrowBanner | null>(null);
+  const [throwBanner, setThrowBanner] = useState<DiscGolfThrowBanner | null>(
+    null,
+  );
+  const [isShotInFlight, setIsShotInFlight] = useState(false);
   const [displayDisc, setDisplayDisc] = useState<FlightPointYards>({
     ...courseHole.tee,
     heightYards: 0.12,
   });
   const [discSink01, setDiscSink01] = useState(0);
   const [madeCallout, setMadeCallout] = useState<string | null>(null);
-  const [roundPhase, setRoundPhase] = useState<DiscGolfRoundPhase>(openingRoundPhase);
+  const [roundPhase, setRoundPhase] =
+    useState<DiscGolfRoundPhase>(openingRoundPhase);
   const [playerName, setPlayerName] = useState(openingPlayerName);
   const [flyoverProgress01, setFlyoverProgress01] = useState(0);
   const [flyoverGeneration, setFlyoverGeneration] = useState(0);
@@ -98,9 +115,9 @@ export function DiscGolfDemo(props: {
   const [leaderboard, setLeaderboard] = useState<DiscGolfLeaderboardEntry[]>(
     readDiscGolfLeaderboard,
   );
-  const [currentCardFinishedAt, setCurrentCardFinishedAt] = useState<string | null>(
-    null,
-  );
+  const [currentCardFinishedAt, setCurrentCardFinishedAt] = useState<
+    string | null
+  >(null);
 
   const canPlay = roundPhase === "play" && !isHoleComplete && !isRoundComplete;
   const cameraMode = cameraModeForPhase(roundPhase);
@@ -112,33 +129,37 @@ export function DiscGolfDemo(props: {
   const scoreVsPar = holeScores.reduce((sum, throws, index) => {
     return sum + throws - NINE_HOLE_COURSE[index].par;
   }, 0);
-  const yardsToBasket = Math.hypot(
-    courseHole.basket.xYards - lie.xYards,
-    courseHole.basket.yYards - lie.yYards,
-  );
   const visibleAimSide = visibleAimSideForThrow(
     throwPower,
     throwHyzer01,
     windAimSide,
   );
-  const hyzerAimPath = previewThrowFlight({
-    courseHole,
-    disc: selectedDisc,
-    lie,
-    headingDegrees,
-    power: 1,
-    hyzer01: -0.85,
-    courseWind,
-  });
-  const anhyzerAimPath = previewThrowFlight({
-    courseHole,
-    disc: selectedDisc,
-    lie,
-    headingDegrees,
-    power: 1,
-    hyzer01: 0.85,
-    courseWind,
-  });
+  const hyzerAimPath = useMemo(
+    () =>
+      previewThrowFlight({
+        courseHole,
+        disc: selectedDisc,
+        lie,
+        headingDegrees,
+        power: 1,
+        hyzer01: -0.85,
+        courseWind,
+      }),
+    [courseHole, selectedDisc, lie, headingDegrees, courseWind],
+  );
+  const anhyzerAimPath = useMemo(
+    () =>
+      previewThrowFlight({
+        courseHole,
+        disc: selectedDisc,
+        lie,
+        headingDegrees,
+        power: 1,
+        hyzer01: 0.85,
+        courseWind,
+      }),
+    [courseHole, selectedDisc, lie, headingDegrees, courseWind],
+  );
 
   const unwrappedDegreesRef = useRef<number | null>(null);
   const addressDegreesRef = useRef<number | null>(null);
@@ -148,6 +169,7 @@ export function DiscGolfDemo(props: {
   const lastDeltaRef = useRef(0);
   const appliedFeelRef = useRef<string | null>(null);
   const isAnimatingThrowRef = useRef(false);
+  const shotAnimationFrameRef = useRef(0);
   const keyboardWindSideRef = useRef<"left" | "right" | "flat" | null>(null);
   const keyboardWindStartedAtRef = useRef(0);
   const playModeRef = useRef(playMode);
@@ -155,11 +177,21 @@ export function DiscGolfDemo(props: {
   const throwPowerRef = useRef(throwPower);
   throwPowerRef.current = throwPower;
   const enableMotorRef = useRef<() => Promise<void>>(async () => {});
-  const hitThrowRef = useRef<(power: number, hyzer01: number) => void>(() => {});
+  const hitThrowRef = useRef<(power: number, hyzer01: number) => void>(
+    () => {},
+  );
   const hasSavedRoundRef = useRef(false);
   const holeOutTimerRef = useRef<number | null>(null);
 
   const resetHole = (nextHoleNumber: number) => {
+    window.cancelAnimationFrame(shotAnimationFrameRef.current);
+    if (holeOutTimerRef.current != null)
+      window.clearTimeout(holeOutTimerRef.current);
+    isAnimatingThrowRef.current = false;
+    setIsShotInFlight(false);
+
+    keyboardWindSideRef.current = null;
+    setThrowBanner(null);
     const nextHole = courseHoleByNumber(nextHoleNumber);
     setHoleNumber(nextHoleNumber);
     setLie(nextHole.tee);
@@ -167,7 +199,10 @@ export function DiscGolfDemo(props: {
     setDisplayDisc({ ...nextHole.tee, heightYards: 0.12 });
     setDiscSink01(0);
     setMadeCallout(null);
-    const pinHeadingDegrees = headingDegreesToBasket(nextHole.tee, nextHole.basket);
+    const pinHeadingDegrees = headingDegreesToBasket(
+      nextHole.tee,
+      nextHole.basket,
+    );
     setHeadingDegrees(pinHeadingDegrees);
     headingAtAimStartRef.current = pinHeadingDegrees;
     setThrowPower(0);
@@ -221,7 +256,10 @@ export function DiscGolfDemo(props: {
     }
     hasSavedRoundRef.current = true;
     const finishedAt = new Date().toISOString();
-    const totalThrowsForCard = nextScores.reduce((sum, throws) => sum + throws, 0);
+    const totalThrowsForCard = nextScores.reduce(
+      (sum, throws) => sum + throws,
+      0,
+    );
     const scoreVsParForCard = nextScores.reduce(
       (sum, throws, index) => sum + throws - NINE_HOLE_COURSE[index].par,
       0,
@@ -237,7 +275,8 @@ export function DiscGolfDemo(props: {
     });
     setCurrentCardFinishedAt(finishedAt);
     setLeaderboard(saved);
-    window.setTimeout(() => {
+    holeOutTimerRef.current = window.setTimeout(() => {
+      setMadeCallout(null);
       setRoundPhase("round-results");
     }, HOLE_OUT_HOLD_MS);
   };
@@ -247,20 +286,22 @@ export function DiscGolfDemo(props: {
     onFinished: () => void,
   ) => {
     isAnimatingThrowRef.current = true;
+    setIsShotInFlight(true);
     const startedAt = performance.now();
-    const durationMs = Math.min(1600, 480 + path.length * 14);
+    const durationMs = Math.min(3200, 1400 + path.length * 25);
     const step = (now: number) => {
       const t = Math.min(1, (now - startedAt) / durationMs);
       const ease = 1 - (1 - t) ** 2;
       setDisplayDisc(pointAlongFlightPath(path, ease));
       if (t < 1) {
-        window.requestAnimationFrame(step);
+        shotAnimationFrameRef.current = window.requestAnimationFrame(step);
         return;
       }
       setDisplayDisc(path[path.length - 1]);
+      setIsShotInFlight(false);
       onFinished();
     };
-    window.requestAnimationFrame(step);
+    shotAnimationFrameRef.current = window.requestAnimationFrame(step);
   };
 
   const animateDiscSink = (onFinished: () => void) => {
@@ -269,13 +310,13 @@ export function DiscGolfDemo(props: {
       const t = Math.min(1, (now - startedAt) / HOLE_OUT_SINK_MS);
       setDiscSink01(t * t);
       if (t < 1) {
-        window.requestAnimationFrame(step);
+        shotAnimationFrameRef.current = window.requestAnimationFrame(step);
         return;
       }
       setDiscSink01(1);
       onFinished();
     };
-    window.requestAnimationFrame(step);
+    shotAnimationFrameRef.current = window.requestAnimationFrame(step);
   };
 
   const hitThrow = (power: number, hyzer01: number) => {
@@ -288,6 +329,7 @@ export function DiscGolfDemo(props: {
       return;
     }
 
+    setThrowBanner(null);
     const shot = playDiscThrow({
       courseHole,
       disc: selectedDisc,
@@ -319,16 +361,25 @@ export function DiscGolfDemo(props: {
     }
 
     const afterThrowSettles = () => {
+      if (!shot.isInBasket) {
+        setThrowBanner({
+          bannerKey: Date.now(),
+          powerPercent: Math.round(throwStrength * 100),
+          travelYards: Math.round(shot.travelYards),
+          hyzerLabel: hyzerLabel(hyzer01),
+        });
+      }
+
       if (shot.isInBasket) {
-        setDisplayDisc({ ...courseHole.basket, heightYards: 0.9 });
+        setDisplayDisc({ ...courseHole.basket, heightYards: 4.2 });
         animateDiscSink(() => {
           const nextScores = [...holeScores, nextThrows];
           setHoleScores(nextScores);
           setIsHoleComplete(true);
           setMadeCallout(
             nextThrows === 1
-              ? "Ace"
-              : `In the basket · ${nextThrows} throws`,
+              ? "Ace!"
+              : holeScoreName(nextThrows, courseHole.par),
           );
           setOperatorMessage("");
           if (holeOutTimerRef.current != null) {
@@ -351,8 +402,12 @@ export function DiscGolfDemo(props: {
         return;
       }
 
+      setDisplayDisc({ ...shot.rest, heightYards: 0.12 });
       isAnimatingThrowRef.current = false;
-      const pinHeadingDegrees = headingDegreesToBasket(shot.rest, courseHole.basket);
+      const pinHeadingDegrees = headingDegreesToBasket(
+        shot.rest,
+        courseHole.basket,
+      );
       setHeadingDegrees(pinHeadingDegrees);
       headingAtAimStartRef.current = pinHeadingDegrees;
       setPlayMode("direction");
@@ -371,18 +426,23 @@ export function DiscGolfDemo(props: {
       );
     };
 
-    if (!shot.isInBasket) {
-      setThrowBanner({
-        bannerKey: Date.now(),
-        powerPercent: Math.round(throwStrength * 100),
-        travelYards: Math.round(shot.travelYards),
-        hyzerLabel: hyzerLabel(hyzer01),
-      });
-    }
-
     animateThrowPath(
       shot.displayPath.length > 1
-        ? shot.displayPath
+        ? shot.isInBasket
+          ? shot.displayPath.map((point, index) => {
+              const approach01 = Math.max(
+                0,
+                (index / (shot.displayPath.length - 1) - 0.5) * 2,
+              );
+              return {
+                ...point,
+                heightYards: Math.max(
+                  point.heightYards,
+                  approach01 * approach01 * 4.2,
+                ),
+              };
+            })
+          : shot.displayPath
         : [
             { ...lie, heightYards: 0.12 },
             { ...shot.rest, heightYards: 0.08 },
@@ -395,7 +455,8 @@ export function DiscGolfDemo(props: {
     if (!props.isConnected || !isMotorEnabled) {
       return;
     }
-    const feelKey = nextMode === "direction" ? "direction-damper" : "throw-spring";
+    const feelKey =
+      nextMode === "direction" ? "direction-damper" : "throw-spring";
     if (appliedFeelRef.current === feelKey) {
       return;
     }
@@ -415,6 +476,7 @@ export function DiscGolfDemo(props: {
   };
 
   const selectPlayMode = (nextMode: DiscGolfPlayMode) => {
+    if (isAnimatingThrowRef.current) return;
     setPlayMode(nextMode);
     addressDegreesRef.current = null;
     headingAtAimStartRef.current = headingDegrees;
@@ -458,12 +520,16 @@ export function DiscGolfDemo(props: {
       });
     }
     setOperatorMessage(
-      "Motor on. Direction aims. Throw: left is hyzer, right is anhyzer.",
+      "Motor on. Aim sets your line. Throw: left is hyzer, right is anhyzer.",
     );
   };
 
   useEffect(() => {
     if (roundPhase !== "hole-flyover") {
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setRoundPhase("play");
       return;
     }
     const startedAt = performance.now();
@@ -482,15 +548,29 @@ export function DiscGolfDemo(props: {
   }, [roundPhase, flyoverGeneration]);
 
   useEffect(() => {
+    const cancelCharge = () => {
+      keyboardWindSideRef.current = null;
+      peakThrowRef.current = 0;
+      setThrowPower(0);
+      setThrowHyzer01(0);
+      setWindAimSide(null);
+    };
+    window.addEventListener("blur", cancelCharge);
     return () => {
-      if (holeOutTimerRef.current != null) {
+      window.removeEventListener("blur", cancelCharge);
+      window.cancelAnimationFrame(shotAnimationFrameRef.current);
+      if (holeOutTimerRef.current != null)
         window.clearTimeout(holeOutTimerRef.current);
-      }
     };
   }, []);
 
   useEffect(() => {
-    if (!props.latestStreamSample || !isMotorEnabled || isAnimatingThrowRef.current) {
+    if (
+      !canPlay ||
+      !props.latestStreamSample ||
+      !isMotorEnabled ||
+      isAnimatingThrowRef.current
+    ) {
       return;
     }
 
@@ -502,11 +582,13 @@ export function DiscGolfDemo(props: {
       addressDegreesRef.current = unwrappedDegreesRef.current;
     }
 
-    const deltaDegrees = unwrappedDegreesRef.current - addressDegreesRef.current;
+    const deltaDegrees =
+      unwrappedDegreesRef.current - addressDegreesRef.current;
 
     if (playModeRef.current === "direction") {
       setHeadingDegrees(
-        headingAtAimStartRef.current + deltaDegrees * AIM_DEGREES_PER_KNOB_DEGREE,
+        headingAtAimStartRef.current +
+          deltaDegrees * AIM_DEGREES_PER_KNOB_DEGREE,
       );
       return;
     }
@@ -567,7 +649,7 @@ export function DiscGolfDemo(props: {
       if (event.target instanceof HTMLInputElement) {
         return;
       }
-      if (roundPhase !== "play") {
+      if (roundPhase !== "play" || isAnimatingThrowRef.current) {
         return;
       }
       if (event.key === "a" || event.key === "A") {
@@ -674,7 +756,7 @@ export function DiscGolfDemo(props: {
     }
     const hideBannerAt = window.setTimeout(() => {
       setThrowBanner(null);
-    }, 2000);
+    }, 3200);
     return () => window.clearTimeout(hideBannerAt);
   }, [throwBanner]);
 
@@ -685,7 +767,7 @@ export function DiscGolfDemo(props: {
     props.onHeaderActionsChange({
       isConnected: props.isConnected,
       isMotorEnabled,
-      canThrow: canPlay,
+      canThrow: canPlay && !isShotInFlight,
       onEnableMotor: () => {
         void enableMotorRef.current();
       },
@@ -694,7 +776,7 @@ export function DiscGolfDemo(props: {
       },
     });
     return () => props.onHeaderActionsChange(null);
-  }, [props.isConnected, isMotorEnabled, canPlay]);
+  }, [props.isConnected, isMotorEnabled, canPlay, isShotInFlight]);
 
   return (
     <section className="golf-demo disc-golf-demo">
@@ -709,6 +791,7 @@ export function DiscGolfDemo(props: {
         discSink01={discSink01}
         cameraMode={cameraMode}
         flyoverProgress01={flyoverProgress01}
+        isShotInFlight={isShotInFlight}
       />
       {roundPhase === "play" ? (
         <DiscGolfPlayerDashboard
@@ -720,25 +803,69 @@ export function DiscGolfDemo(props: {
           throwHyzer01={throwHyzer01}
           courseWind={courseWind}
           throwsThisHole={throwsThisHole}
-          yardsToBasket={yardsToBasket}
+          yardsToBasket={Math.hypot(
+            courseHole.basket.xYards - displayDisc.xYards,
+            courseHole.basket.yYards - displayDisc.yYards,
+          )}
           scoreVsPar={scoreVsPar}
           totalThrows={totalThrows}
           completedHoleCount={holeScores.length}
           operatorMessage={operatorMessage}
           lieLabel={liePowerLabel(lieSurface)}
           throwBanner={throwBanner}
+          position={displayDisc}
+          headingDegrees={headingDegrees}
+          isInFlight={isShotInFlight}
+          isComplete={isHoleComplete || discSink01 > 0}
+          onPreviousEquipment={() =>
+            setSelectedDiscId((current) => previousDiscId(current))
+          }
+          onNextEquipment={() =>
+            setSelectedDiscId((current) => nextDiscId(current))
+          }
+          onAimLeft={() => setHeadingDegrees((current) => current - 2)}
+          onAimRight={() => setHeadingDegrees((current) => current + 2)}
+          onCharge={() => {
+            if (!canPlay || isAnimatingThrowRef.current) return;
+            selectPlayMode("throw");
+            beginKeyboardWind("flat");
+          }}
+          onRelease={releaseKeyboardWind}
+          onCancelCharge={() => {
+            keyboardWindSideRef.current = null;
+            peakThrowRef.current = 0;
+            setThrowPower(0);
+            setThrowHyzer01(0);
+            setWindAimSide(null);
+          }}
           onSelectDirectionMode={() => selectPlayMode("direction")}
           onSelectThrowMode={() => selectPlayMode("throw")}
         />
       ) : null}
       {madeCallout ? (
         <div className="golf-made-callout" role="status">
-          <p className="golf-made-kicker">In the basket</p>
-          <p className="golf-made-detail">{madeCallout}</p>
+          <p className="course-eyebrow">IN THE BASKET</p>
+          <div className="course-celebration-seal" aria-hidden="true">
+            ✦
+          </div>
+          <p className="golf-made-kicker">{madeCallout}</p>
+          <p className="golf-made-detail">
+            Hole {holeNumber} · {throwsThisHole} throws · Par {courseHole.par}
+          </p>
+          <p className="course-celebration-next">
+            {holeNumber === 9
+              ? "Your scorecard is ready"
+              : "Next tee coming up"}
+          </p>
         </div>
       ) : null}
       {roundPhase === "hole-flyover" ? (
-        <DiscGolfHoleIntro courseHole={courseHole} courseWind={courseWind} />
+        <DiscGolfHoleIntro
+          courseHole={courseHole}
+          courseWind={courseWind}
+          progress01={flyoverProgress01}
+          onSkip={() => setRoundPhase("play")}
+        />
       ) : null}
       {roundPhase === "enter-name" ? (
         <DiscGolfNameScreen
@@ -787,8 +914,12 @@ function pointAlongFlightPath(
   }
   let alongYards = totalYards * progress01;
   for (let index = 0; index < segmentYards.length; index += 1) {
-    if (alongYards <= segmentYards[index] || index === segmentYards.length - 1) {
-      const t = segmentYards[index] === 0 ? 1 : alongYards / segmentYards[index];
+    if (
+      alongYards <= segmentYards[index] ||
+      index === segmentYards.length - 1
+    ) {
+      const t =
+        segmentYards[index] === 0 ? 1 : alongYards / segmentYards[index];
       return {
         xYards:
           path[index].xYards +

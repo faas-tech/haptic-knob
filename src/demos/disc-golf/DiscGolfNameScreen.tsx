@@ -16,12 +16,22 @@ export function DiscGolfNameScreen(props: {
   const readyName = normalizePlayerName(playerName);
 
   return (
-    <div className="golf-round-overlay">
+    <div className="golf-round-overlay course-welcome">
       <div className="golf-round-card disc-golf-card">
-        <p className="golf-dash-kicker">{COURSE_NAME}</p>
-        <h2>Nine holes. Par {COURSE_PAR}.</h2>
+        <p className="golf-dash-kicker">AFTER HOURS · DISC GOLF</p>
+        <h2>
+          {COURSE_NAME.split(" ")[0]}
+          <br />
+          <em>{COURSE_NAME.split(" ").slice(1).join(" ")}</em>
+        </h2>
+        <div className="course-welcome-tags">
+          <span>9 HOLES</span>
+          <span>PAR {COURSE_PAR}</span>
+          <span>TWILIGHT</span>
+        </div>
         <p className="golf-round-copy">
-          Name the card. Direction aims. Throw winds left or right.
+          Shape your flight through a glowing forest. Chase the chains, one
+          basket at a time.
         </p>
         <form
           className="golf-name-form"
@@ -48,9 +58,14 @@ export function DiscGolfNameScreen(props: {
             className="button-primary"
             disabled={!isPlayerNameReady(readyName)}
           >
-            Start round
+            Enter the circuit ↗
           </button>
         </form>
+        <p className="course-welcome-controls">
+          Play with your knob, mouse, or keyboard.
+          <br />
+          <kbd>← →</kbd> Aim <kbd>SPACE</kbd> Hold and release
+        </p>
         <DiscGolfLeaderboardTable
           entries={props.leaderboard}
           emptyCopy="No cards yet. The first name on the board is yours."
