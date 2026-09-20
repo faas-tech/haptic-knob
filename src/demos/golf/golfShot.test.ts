@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { PUTTER, SWING_CLUBS, swingClubAtDetentIndex } from "./golfClubs";
+import {
+  PUTTER,
+  SWING_CLUBS,
+  swingClubAfterDetentSteps,
+  swingClubAfterLeftDetentSteps,
+  swingClubAtDetentIndex,
+} from "./golfClubs";
 import {
   COURSE_NAME,
   COURSE_PAR,
   courseHoleByNumber,
   distanceYards,
   headingDegreesToCup,
+  startingAimHeadingDegrees,
   surfaceAtPosition,
   TREE_CANOPY_RADIUS_YARDS,
   TREE_TRUNK_RADIUS_YARDS,
@@ -15,7 +22,12 @@ import {
   liePowerScale,
   playGolfShot,
   aimFlightArcPoints,
+  previewGolfShotPath,
   punchOutHeadingDegrees,
+  puttPowerFromHold01,
+  shotLateralYards,
+  shotShapeLabel,
+  swingFromKnobDelta,
   swingPowerFromHold01,
 } from "./golfShot";
 import type { CourseWind } from "./golfWind";
@@ -28,9 +40,41 @@ describe("swingClubAtDetentIndex", () => {
     expect(swingClubAtDetentIndex(4).id).toBe("driver");
     expect(swingClubAtDetentIndex(5).id).toBe("pitching-wedge");
   });
+
+  it("walks the bag both ways from a dedicated club detent", () => {
+    expect(swingClubAfterDetentSteps("five-iron", 1)).toBe("hybrid");
+    expect(swingClubAfterDetentSteps("five-iron", -1)).toBe("eight-iron");
+    expect(swingClubAfterDetentSteps("pitching-wedge", -1)).toBe("driver");
+  });
+
+  it("keeps rotating through the bag as left detents continue", () => {
+    expect(swingClubAfterLeftDetentSteps("five-iron", 0)).toBe("five-iron");
+    expect(swingClubAfterLeftDetentSteps("five-iron", 1)).toBe("hybrid");
+    expect(swingClubAfterLeftDetentSteps("five-iron", 3)).toBe("pitching-wedge");
+    expect(swingClubAfterLeftDetentSteps("driver", 1)).toBe("pitching-wedge");
+    expect(swingClubAfterLeftDetentSteps("pitching-wedge", 9)).toBe("driver");
+    expect(swingClubAfterLeftDetentSteps("pitching-wedge", 10)).toBe(
+      "pitching-wedge",
+    );
+  });
 });
 
 describe("Engineer Alley", () => {
+  it("aims every shot at the pin", () => {
+    const cam = courseHoleByNumber(3);
+    const teeHeading = startingAimHeadingDegrees(cam, cam.tee);
+    const pinHeading = headingDegreesToCup(cam.tee, cam.cup);
+    expect(teeHeading).toBeCloseTo(pinHeading, 5);
+    const fromFairway = startingAimHeadingDegrees(cam, {
+      xYards: 76,
+      yYards: 186,
+    });
+    expect(fromFairway).toBeCloseTo(
+      headingDegreesToCup({ xYards: 76, yYards: 186 }, cam.cup),
+      5,
+    );
+  });
+
   it("is a par-36 nine with mixed 3s, 4s, and 5s", () => {
     expect(COURSE_NAME).toBe("Engineer Alley");
     expect(COURSE_PAR).toBe(36);
@@ -118,6 +162,18 @@ describe("playGolfShot", () => {
     expect(shot.isInCup).toBe(true);
   });
 
+  it("holes an on-line putt that is a bit long", () => {
+    expect(puttOnFlatGreen(8, 8 + 5, 0).isInCup).toBe(true);
+  });
+
+  it("holes a dying putt that is a little offline", () => {
+    expect(puttOnFlatGreen(4, 4.2, 8).isInCup).toBe(true);
+  });
+
+  it("holes a putt that dies in the cup well", () => {
+    expect(puttOnFlatGreen(4, 3.45, 0).isInCup).toBe(true);
+  });
+
   it("stops a holed putt at the cup instead of rolling past", () => {
     const hole = flatPuttHole();
     const shot = puttOnFlatGreen(4, 6, 0);
@@ -129,27 +185,27 @@ describe("playGolfShot", () => {
     expect(farthestPastYards).toBeLessThan(hole.cup.yYards + 1.2);
   });
 
-  it("halves leftover run when an on-line putt would go well past the cup", () => {
+  it("lips out a rocket and keeps only a short leftover run", () => {
     const hole = flatPuttHole();
-    const shot = puttOnFlatGreen(4, 4 + 6, 0);
+    const shot = puttOnFlatGreen(4, 4 + 16, 0);
     expect(shot.isInCup).toBe(false);
     expect(shot.rest.xYards).toBeCloseTo(hole.cup.xYards, 1);
     expect(shot.rest.yYards).toBeGreaterThan(hole.cup.yYards + 2);
-    expect(shot.rest.yYards).toBeLessThan(hole.cup.yYards + 4);
+    expect(shot.rest.yYards).toBeLessThan(hole.cup.yYards + 10);
   });
 
-  it("leaves a short putt short of the cup", () => {
+  it("leaves a putt that never reaches the cup well short", () => {
     const hole = flatPuttHole();
-    const shot = puttOnFlatGreen(4, 2.6, 0);
+    const shot = puttOnFlatGreen(4, 2.2, 0);
     expect(shot.isInCup).toBe(false);
-    expect(shot.rest.yYards).toBeLessThan(hole.cup.yYards - 0.6);
+    expect(shot.rest.yYards).toBeLessThan(hole.cup.yYards - 1.1);
   });
 
   it("does not hole a putt that misses the cup wide", () => {
     const hole = flatPuttHole();
-    const shot = puttOnFlatGreen(4, 5, 22);
+    const shot = puttOnFlatGreen(4, 5, 36);
     expect(shot.isInCup).toBe(false);
-    expect(distanceYards(shot.rest, hole.cup)).toBeGreaterThan(1.3);
+    expect(distanceYards(shot.rest, hole.cup)).toBeGreaterThan(1.6);
   });
 
   it("breaks a north putt west on an east-rising green", () => {
@@ -167,8 +223,8 @@ describe("playGolfShot", () => {
       courseWind: CALM_WIND,
     });
     expect(shot.isInCup).toBe(false);
-    expect(shot.rest.xYards).toBeLessThan(ball.xYards - 0.9);
-    expect(shot.rest.xYards).toBeGreaterThan(ball.xYards - 2.8);
+    expect(shot.rest.xYards).toBeLessThan(ball.xYards - 0.45);
+    expect(shot.rest.xYards).toBeGreaterThan(ball.xYards - 2.4);
   });
 
   it("pushes a full wedge east when the wind blows east", () => {
@@ -201,6 +257,117 @@ describe("aimFlightArcPoints", () => {
     expect(wedge[8].alongYards).toBeCloseTo(100, 5);
     expect(wedge[8].heightYards).toBeCloseTo(0, 5);
     expect(wedge[4].heightYards).toBeGreaterThan(driver[4].heightYards);
+  });
+});
+
+describe("swingFromKnobDelta", () => {
+  it("maps a right wind to fade and a left wind to draw", () => {
+    const fade = swingFromKnobDelta(90);
+    expect(fade.power).toBeCloseTo(1, 5);
+    expect(fade.shape01).toBeCloseTo(1, 5);
+    expect(shotShapeLabel(fade.shape01)).toBe("Fade");
+    const draw = swingFromKnobDelta(-45);
+    expect(draw.power).toBeGreaterThan(0.4);
+    expect(draw.shape01).toBeLessThan(-0.4);
+    expect(shotShapeLabel(draw.shape01)).toBe("Draw");
+    expect(swingFromKnobDelta(3).power).toBe(0);
+  });
+});
+
+describe("shotLateralYards", () => {
+  it("starts on the aim line and bends like a spin banana", () => {
+    expect(shotLateralYards({ progress01: 0, shape01: 1, carryYards: 100 })).toBeCloseTo(0, 5);
+    expect(
+      shotLateralYards({ progress01: 0.5, shape01: 1, carryYards: 100 }),
+    ).toBeCloseTo(6, 5);
+    expect(shotLateralYards({ progress01: 1, shape01: 1, carryYards: 100 })).toBeCloseTo(12, 5);
+    expect(
+      shotLateralYards({ progress01: 0.25, shape01: 1, carryYards: 100 }),
+    ).toBeLessThan(
+      shotLateralYards({ progress01: 0.5, shape01: 1, carryYards: 100 }),
+    );
+    expect(
+      shotLateralYards({ progress01: 0.5, shape01: -1, carryYards: 100 }),
+    ).toBeCloseTo(-6, 5);
+  });
+});
+
+describe("shot shape", () => {
+  it("curves a fade right in a smooth arc that starts on the aim line", () => {
+    const hole = treeTestHole([]);
+    const shot = playGolfShot({
+      courseHole: hole,
+      ball: hole.tee,
+      lastSafeLie: hole.tee,
+      club: SWING_CLUBS[0],
+      headingDegrees: 0,
+      power: 1,
+      courseWind: CALM_WIND,
+      shape01: 1,
+    });
+    const laterals = shot.displayPath.map(
+      (point) => point.xYards - hole.tee.xYards,
+    );
+    expect(laterals[1]).toBeGreaterThanOrEqual(-0.2);
+    expect(laterals[1]).toBeLessThan(1.2);
+    expect(laterals[laterals.length - 1]).toBeGreaterThan(6);
+    for (let index = 1; index < laterals.length; index += 1) {
+      expect(laterals[index]).toBeGreaterThanOrEqual(laterals[index - 1] - 0.05);
+    }
+    for (let index = 2; index < laterals.length - 1; index += 1) {
+      const incoming = laterals[index] - laterals[index - 1];
+      const outgoing = laterals[index + 1] - laterals[index];
+      expect(Math.abs(outgoing - incoming)).toBeLessThan(0.35);
+    }
+  });
+
+  it("curves a draw left in a smooth arc that starts on the aim line", () => {
+    const hole = treeTestHole([]);
+    const shot = playGolfShot({
+      courseHole: hole,
+      ball: hole.tee,
+      lastSafeLie: hole.tee,
+      club: SWING_CLUBS[0],
+      headingDegrees: 0,
+      power: 1,
+      courseWind: CALM_WIND,
+      shape01: -1,
+    });
+    const laterals = shot.displayPath.map(
+      (point) => point.xYards - hole.tee.xYards,
+    );
+    expect(laterals[1]).toBeLessThanOrEqual(0.2);
+    expect(laterals[laterals.length - 1]).toBeLessThan(-6);
+    for (let index = 1; index < laterals.length; index += 1) {
+      expect(laterals[index]).toBeLessThanOrEqual(laterals[index - 1] + 0.05);
+    }
+  });
+
+  it("previews fade as a lofted banana, not a polyline", () => {
+    const path = previewGolfShotPath({
+      ball: { xYards: 0, yYards: 0 },
+      headingDegrees: 0,
+      loftDegrees: 46,
+      carryYards: 100,
+      shape01: 1,
+      pointCount: 33,
+    });
+    expect(path[0]).toMatchObject({ xYards: 0, yYards: 0, heightYards: 0 });
+    expect(path[16].heightYards).toBeGreaterThan(8);
+    expect(path[16].xYards).toBeGreaterThan(2);
+    expect(path[32].xYards).toBeCloseTo(12, 5);
+    expect(path[32].heightYards).toBeCloseTo(0, 5);
+  });
+});
+
+describe("puttPowerFromHold01", () => {
+  it("maps spring wind near linearly so a half stroke travels about half the putt", () => {
+    expect(puttPowerFromHold01(0)).toBe(0);
+    expect(puttPowerFromHold01(0.2)).toBeCloseTo(0.162, 2);
+    expect(puttPowerFromHold01(0.5)).toBeGreaterThan(0.42);
+    expect(puttPowerFromHold01(0.5)).toBeLessThan(0.52);
+    expect(puttPowerFromHold01(0.2)).toBeLessThan(swingPowerFromHold01(0.2));
+    expect(puttPowerFromHold01(1)).toBe(1);
   });
 });
 

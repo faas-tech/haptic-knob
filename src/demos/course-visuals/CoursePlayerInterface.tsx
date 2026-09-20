@@ -19,6 +19,8 @@ export function CoursePlayerInterface(props: {
   isInFlight: boolean;
   isComplete: boolean;
   isAiming: boolean;
+  isSelectingClub?: boolean;
+  onSelectClubMode?: () => void;
   windSpeedMph: number;
   windHeadingDegrees: number;
   equipmentName: string;
@@ -190,11 +192,24 @@ export function CoursePlayerInterface(props: {
             >
               <kbd>A</kbd> Aim
             </button>
+            {props.onSelectClubMode ? (
+              <button
+                type="button"
+                aria-pressed={Boolean(props.isSelectingClub)}
+                disabled={isDisabled}
+                className={props.isSelectingClub ? "is-active" : ""}
+                onClick={props.onSelectClubMode}
+              >
+                <kbd>C</kbd> {props.sport === "disc-golf" ? "Disc" : "Club"}
+              </button>
+            ) : null}
             <button
               type="button"
-              aria-pressed={!props.isAiming}
+              aria-pressed={!props.isAiming && !props.isSelectingClub}
               disabled={isDisabled}
-              className={!props.isAiming ? "is-active" : ""}
+              className={
+                !props.isAiming && !props.isSelectingClub ? "is-active" : ""
+              }
               onClick={props.onPrepareShot}
             >
               <kbd>S</kbd> {action}
@@ -267,13 +282,13 @@ export function CoursePlayerInterface(props: {
         <p className="course-control-hint">
           {props.sport === "golf" ? (
             <>
-              <kbd>← →</kbd> Aim <kbd>[ ]</kbd> Clubs <kbd>SPACE</kbd> Hold,
-              then release
+              <kbd>A</kbd> Aim <kbd>C</kbd> Clubs <kbd>S</kbd> Swing{" "}
+              <kbd>Z</kbd> Draw <kbd>X</kbd> Fade <kbd>SPACE</kbd> Straight
             </>
           ) : (
             <>
+              <kbd>A</kbd> Aim <kbd>C</kbd> Discs <kbd>S</kbd> Throw{" "}
               <kbd>Z</kbd> Hyzer <kbd>X</kbd> Anhyzer <kbd>SPACE</kbd> Flat
-              throw
             </>
           )}
         </p>

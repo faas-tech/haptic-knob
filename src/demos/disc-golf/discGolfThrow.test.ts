@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DISC_BAG, discAtBagIndex, discById } from "./discGolfDiscs";
+import {
+  DISC_BAG,
+  discAfterDetentSteps,
+  discAtBagIndex,
+  discById,
+} from "./discGolfDiscs";
 import {
   COURSE_NAME,
   COURSE_PAR,
@@ -36,6 +41,9 @@ describe("disc bag", () => {
     expect(discById("target").carryYards).toBeLessThan(
       discById("standard").carryYards,
     );
+    expect(discAfterDetentSteps("standard", 1)).toBe("target");
+    expect(discAfterDetentSteps("standard", -1)).toBe("long-shot");
+    expect(discAfterDetentSteps("target", 1)).toBe("long-shot");
   });
 
   it("makes long-shot the most wind-sensitive and the most bendy", () => {
@@ -254,6 +262,68 @@ describe("playDiscThrow", () => {
     const longShotLoss = longShotCalm.travelYards - longShotWind.travelYards;
     const targetLoss = targetCalm.travelYards - targetWind.travelYards;
     expect(longShotLoss).toBeGreaterThan(targetLoss + 4);
+  });
+
+  it("keeps a Target throw in the chain band as it reaches the basket", () => {
+    const hole = openHole();
+    const lie = {
+      xYards: hole.basket.xYards,
+      yYards: hole.basket.yYards - 12,
+    };
+    const shot = playDiscThrow({
+      courseHole: hole,
+      disc: discById("target"),
+      lie,
+      lastSafeLie: lie,
+      headingDegrees: headingDegreesToBasket(lie, hole.basket),
+      power: 0.34,
+      hyzer01: 0,
+      courseWind: CALM_WIND,
+    });
+    const nearBasket = shot.displayPath.find(
+      (point) => distanceYards(point, hole.basket) < 3.2,
+    );
+    expect(nearBasket).toBeTruthy();
+    expect(nearBasket?.heightYards).toBeGreaterThan(2.2);
+    expect(shot.isInBasket).toBe(true);
+  });
+
+  it("catches a disc that flies through the chains a little offline", () => {
+    const hole = openHole();
+    const lie = {
+      xYards: hole.basket.xYards - 1.6,
+      yYards: hole.basket.yYards - 14,
+    };
+    const shot = playDiscThrow({
+      courseHole: hole,
+      disc: discById("target"),
+      lie,
+      lastSafeLie: lie,
+      headingDegrees: 0,
+      power: 0.4,
+      hyzer01: 0,
+      courseWind: CALM_WIND,
+    });
+    expect(shot.isInBasket).toBe(true);
+  });
+
+  it("misses a throw that stays wide of the chains", () => {
+    const hole = openHole();
+    const lie = {
+      xYards: hole.basket.xYards - 6,
+      yYards: hole.basket.yYards - 16,
+    };
+    const shot = playDiscThrow({
+      courseHole: hole,
+      disc: discById("target"),
+      lie,
+      lastSafeLie: lie,
+      headingDegrees: 0,
+      power: 0.45,
+      hyzer01: 0,
+      courseWind: CALM_WIND,
+    });
+    expect(shot.isInBasket).toBe(false);
   });
 
   it("catches a slow Target in the basket and stops the path there", () => {

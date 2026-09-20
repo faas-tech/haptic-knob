@@ -22,6 +22,7 @@ import {
 } from "./DiscGolfPlayerDashboard";
 import { DiscGolfRoundResults } from "./DiscGolfRoundResults";
 import {
+  discAfterDetentSteps,
   discById,
   nextDiscId,
   previousDiscId,
@@ -51,6 +52,10 @@ import {
 } from "./discGolfThrow";
 import { rollCourseWind } from "./discGolfWind";
 
+const DIRECTION_DETENT_COUNT = 36;
+const DISC_DETENT_COUNT = 16;
+const DISC_DETENT_SPACING_DEGREES = 360 / DISC_DETENT_COUNT;
+const HAPTIC_SETTLE_MS = 220;
 const WIND_KEY_SECONDS = 1.4;
 const AIM_DEGREES_PER_KNOB_DEGREE = 0.35;
 const HOLE_FLYOVER_MS = 5000;
@@ -164,6 +169,12 @@ export function DiscGolfDemo(props: {
   const unwrappedDegreesRef = useRef<number | null>(null);
   const addressDegreesRef = useRef<number | null>(null);
   const headingAtAimStartRef = useRef(headingDegrees);
+  const headingDegreesRef = useRef(headingDegrees);
+  headingDegreesRef.current = headingDegrees;
+  const selectedDiscIdRef = useRef(selectedDiscId);
+  selectedDiscIdRef.current = selectedDiscId;
+  const discAtSelectStartRef = useRef<DiscId>(selectedDiscId);
+  const ignoreKnobInputUntilMsRef = useRef(0);
   const peakThrowRef = useRef(0);
   const peakHyzerRef = useRef(0);
   const lastDeltaRef = useRef(0);
@@ -411,6 +422,7 @@ export function DiscGolfDemo(props: {
       setHeadingDegrees(pinHeadingDegrees);
       headingAtAimStartRef.current = pinHeadingDegrees;
       setPlayMode("direction");
+      void applyFeelForPlayMode("direction");
       if (shot.tookWaterPenalty) {
         setOperatorMessage(
           "Water. One penalty throw. Disc is back on the last dry lie.",
@@ -428,21 +440,7 @@ export function DiscGolfDemo(props: {
 
     animateThrowPath(
       shot.displayPath.length > 1
-        ? shot.isInBasket
-          ? shot.displayPath.map((point, index) => {
-              const approach01 = Math.max(
-                0,
-                (index / (shot.displayPath.length - 1) - 0.5) * 2,
-              );
-              return {
-                ...point,
-                heightYards: Math.max(
-                  point.heightYards,
-                  approach01 * approach01 * 4.2,
-                ),
-              };
-            })
-          : shot.displayPath
+        ? shot.displayPath
         : [
             { ...lie, heightYards: 0.12 },
             { ...shot.rest, heightYards: 0.08 },
@@ -451,45 +449,85 @@ export function DiscGolfDemo(props: {
     );
   };
 
-  const applyFeelForPlayMode = (nextMode: DiscGolfPlayMode) => {
+  const beginHapticSettle = () => {
+    ignoreKnobInputUntilMsRef.current = performance.now() + HAPTIC_SETTLE_MS;
+    addressDegreesRef.current = null;
+    lastDeltaRef.current = 0;
+    peakThrowRef.current = 0;
+    peakHyzerRef.current = 0;
+    setThrowPower(0);
+    setThrowHyzer01(0);
+  };
+
+  const applyFeelForPlayMode = async (
+    nextMode: DiscGolfPlayMode,
+    options?: { forceWrite?: boolean },
+  ) => {
     if (!props.isConnected || !isMotorEnabled) {
       return;
     }
     const feelKey =
-      nextMode === "direction" ? "direction-damper" : "throw-spring";
-    if (appliedFeelRef.current === feelKey) {
+      nextMode === "direction"
+        ? "direction-detent"
+        : nextMode === "disc"
+          ? "disc-detent"
+          : "throw-spring";
+    if (!options?.forceWrite && appliedFeelRef.current === feelKey) {
+      return;
+    }
+    discAtSelectStartRef.current = selectedDiscIdRef.current;
+    const feelReply =
+      nextMode === "direction"
+        ? await applyHapticMode(props.sendKnobCommand, "detent", {
+            detentCount: DIRECTION_DETENT_COUNT,
+            stiffnessPercent: 22,
+            dampingPercent: 14,
+          })
+        : nextMode === "disc"
+          ? await applyHapticMode(props.sendKnobCommand, "detent", {
+              detentCount: DISC_DETENT_COUNT,
+              stiffnessPercent: 28,
+              dampingPercent: 16,
+            })
+          : await applyHapticMode(props.sendKnobCommand, "spring", {
+              stiffnessPercent: 34,
+              dampingPercent: 28,
+            });
+    if (!feelReply.confirmed) {
+      setOperatorMessage(
+        `Feel did not confirm: ${feelReply.error?.message ?? "no reply"}`,
+      );
       return;
     }
     appliedFeelRef.current = feelKey;
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
-    if (nextMode === "direction") {
-      void applyHapticMode(props.sendKnobCommand, "damper", {
-        dampingPercent: 38,
-      });
-      return;
-    }
-    void applyHapticMode(props.sendKnobCommand, "spring", {
-      stiffnessPercent: 34,
-      dampingPercent: 28,
-    });
+    beginHapticSettle();
   };
 
   const selectPlayMode = (nextMode: DiscGolfPlayMode) => {
     if (isAnimatingThrowRef.current) return;
+    if (nextMode === playModeRef.current) {
+      if (nextMode === "direction") {
+        void applyFeelForPlayMode("direction", { forceWrite: true });
+      }
+      return;
+    }
+    if (nextMode === "direction") {
+      headingAtAimStartRef.current = headingDegreesRef.current;
+    }
     setPlayMode(nextMode);
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
+    discAtSelectStartRef.current = selectedDiscIdRef.current;
     peakThrowRef.current = 0;
     peakHyzerRef.current = 0;
     setThrowPower(0);
     setThrowHyzer01(0);
     setWindAimSide(null);
-    applyFeelForPlayMode(nextMode);
+    void applyFeelForPlayMode(nextMode);
     setOperatorMessage(
-      nextMode === "throw"
-        ? "Hold Z or Left for hyzer. Hold X or Right for anhyzer. Space is flat."
-        : "",
+      nextMode === "direction"
+        ? "Fine detents aim at the basket."
+        : nextMode === "disc"
+          ? "Turn either way to change discs."
+          : "Left winds hyzer. Right winds anhyzer. Let the spring back to throw.",
     );
   };
 
@@ -505,22 +543,9 @@ export function DiscGolfDemo(props: {
     await props.sendKnobCommand(KNOB_COMMANDS.startPositionStream50);
     setIsMotorEnabled(true);
     appliedFeelRef.current = null;
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
-    if (playMode === "direction") {
-      appliedFeelRef.current = "direction-damper";
-      await applyHapticMode(props.sendKnobCommand, "damper", {
-        dampingPercent: 38,
-      });
-    } else {
-      appliedFeelRef.current = "throw-spring";
-      await applyHapticMode(props.sendKnobCommand, "spring", {
-        stiffnessPercent: 34,
-        dampingPercent: 28,
-      });
-    }
+    await applyFeelForPlayMode(playModeRef.current);
     setOperatorMessage(
-      "Motor on. Aim sets your line. Throw: left is hyzer, right is anhyzer.",
+      "Motor on. A aims. C turns through discs. S winds a hyzer or anhyzer.",
     );
   };
 
@@ -546,6 +571,13 @@ export function DiscGolfDemo(props: {
     frame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(frame);
   }, [roundPhase, flyoverGeneration]);
+
+  useEffect(() => {
+    if (roundPhase !== "play" || !isMotorEnabled) {
+      return;
+    }
+    void applyFeelForPlayMode(playModeRef.current);
+  }, [roundPhase, holeNumber, isMotorEnabled]);
 
   useEffect(() => {
     const cancelCharge = () => {
@@ -578,6 +610,12 @@ export function DiscGolfDemo(props: {
       unwrappedDegreesRef.current,
       props.latestStreamSample.positionDegrees,
     );
+    if (performance.now() < ignoreKnobInputUntilMsRef.current) {
+      return;
+    }
+    if (keyboardWindSideRef.current) {
+      return;
+    }
     if (addressDegreesRef.current == null) {
       addressDegreesRef.current = unwrappedDegreesRef.current;
     }
@@ -586,9 +624,21 @@ export function DiscGolfDemo(props: {
       unwrappedDegreesRef.current - addressDegreesRef.current;
 
     if (playModeRef.current === "direction") {
+      lastDeltaRef.current = deltaDegrees;
       setHeadingDegrees(
         headingAtAimStartRef.current +
           deltaDegrees * AIM_DEGREES_PER_KNOB_DEGREE,
+      );
+      return;
+    }
+
+    if (playModeRef.current === "disc") {
+      lastDeltaRef.current = deltaDegrees;
+      const detentSteps = Math.round(
+        deltaDegrees / DISC_DETENT_SPACING_DEGREES,
+      );
+      setSelectedDiscId(
+        discAfterDetentSteps(discAtSelectStartRef.current, detentSteps),
       );
       return;
     }
@@ -616,6 +666,9 @@ export function DiscGolfDemo(props: {
   const beginKeyboardWind = (side: "left" | "right" | "flat") => {
     if (keyboardWindSideRef.current) {
       return;
+    }
+    if (playModeRef.current !== "throw") {
+      selectPlayMode("throw");
     }
     keyboardWindSideRef.current = side;
     keyboardWindStartedAtRef.current = performance.now();
@@ -654,6 +707,8 @@ export function DiscGolfDemo(props: {
       }
       if (event.key === "a" || event.key === "A") {
         selectPlayMode("direction");
+      } else if (event.key === "c" || event.key === "C") {
+        selectPlayMode("disc");
       } else if (event.key === "s" || event.key === "S") {
         selectPlayMode("throw");
       } else if (event.key === "[") {
@@ -680,17 +735,11 @@ export function DiscGolfDemo(props: {
         } else {
           setHeadingDegrees((current) => current + 2);
         }
-      } else if (event.key === "z" || event.key === "Z") {
+      } else if ((event.key === "z" || event.key === "Z") && !event.repeat) {
         event.preventDefault();
-        if (playModeRef.current !== "throw") {
-          selectPlayMode("throw");
-        }
         beginKeyboardWind("left");
-      } else if (event.key === "x" || event.key === "X") {
+      } else if ((event.key === "x" || event.key === "X") && !event.repeat) {
         event.preventDefault();
-        if (playModeRef.current !== "throw") {
-          selectPlayMode("throw");
-        }
         beginKeyboardWind("right");
       } else if (event.key === " " && !event.repeat) {
         event.preventDefault();
@@ -700,6 +749,7 @@ export function DiscGolfDemo(props: {
         beginKeyboardWind("flat");
       } else if (event.key === "r" || event.key === "R") {
         resetHole(holeNumber);
+        void applyFeelForPlayMode("direction");
         setOperatorMessage(`Hole ${holeNumber} reset. New wind.`);
       }
     };
@@ -839,6 +889,7 @@ export function DiscGolfDemo(props: {
             setWindAimSide(null);
           }}
           onSelectDirectionMode={() => selectPlayMode("direction")}
+          onSelectDiscMode={() => selectPlayMode("disc")}
           onSelectThrowMode={() => selectPlayMode("throw")}
         />
       ) : null}

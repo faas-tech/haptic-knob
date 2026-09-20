@@ -4,7 +4,7 @@ Use [readable-names](.cursor/skills/readable-names/SKILL.md) for code, file, and
 
 Use Give It to Me Straight (`~/.agents/skills/give-it-to-me-straight/SKILL.md`) for documentation, comments, and on-screen copy. After every draft, run the second pass in `references/second-pass.md`: read the last sentence of each paragraph and cut `it's not X, it's Y` closers.
 
-Read [docs/knob-interface.md](docs/knob-interface.md) before changing Bluetooth or haptic code.
+Read [docs/knob-interface.md](docs/knob-interface.md) and [docs/controlling-the-smartknob.md](docs/controlling-the-smartknob.md) before changing Bluetooth or haptic code.
 
 ## Stack
 

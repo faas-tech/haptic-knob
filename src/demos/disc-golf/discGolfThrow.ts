@@ -1,6 +1,8 @@
 import type { DiscGolfDisc } from "./discGolfDiscs";
 import {
   BASKET_CATCH_RADIUS_YARDS,
+  BASKET_CHAIN_MAX_HEIGHT_YARDS,
+  BASKET_CHAIN_MIN_HEIGHT_YARDS,
   distanceYards,
   firstTreeHitOnPath,
   headingDegreesToBasket,
@@ -31,9 +33,11 @@ export type ThrowResult = {
   displayPath: FlightPointYards[];
 };
 
-export const BASKET_CATCH_MAX_REMAINING_YARDS = 12;
-export const TARGET_BASKET_CATCH_MAX_REMAINING_YARDS = 16;
+export const BASKET_CATCH_MAX_REMAINING_YARDS = 28;
+export const TARGET_BASKET_CATCH_MAX_REMAINING_YARDS = 32;
 export const FULL_WIND_DEGREES = 90;
+const MIN_THROW_PEAK_HEIGHT_YARDS = 4.6;
+const MAX_THROW_PEAK_HEIGHT_YARDS = 11;
 const FLIGHT_STEP_YARDS = 1.2;
 const SKIP_RATIO = 0.16;
 const TURN_DEGREES_PER_RATING_PER_YARD = 0.42;
@@ -179,8 +183,11 @@ function simulateDiscFlight(args: {
   const hyzer01 = Math.max(-1, Math.min(1, args.hyzer01));
   const hyzerLoss = 1 - Math.abs(hyzer01) * 0.08;
   const flightYards = Math.max(0.4, args.disc.carryYards * power * hyzerLoss);
-  const peakHeightYards =
-    (flightYards * Math.tan((args.disc.loftDegrees * Math.PI) / 180)) / 3.4;
+  const peakHeightYards = throwPeakHeightYards({
+    flightYards,
+    loftDegrees: args.disc.loftDegrees,
+    glide: args.disc.glide,
+  });
   const path: FlightPointYards[] = [
     { ...args.lie, heightYards: 0.12 },
   ];
@@ -265,35 +272,35 @@ function simulateDiscFlight(args: {
     xYards = nextPoint.xYards;
     yYards = nextPoint.yYards;
     const flown01 = 1 - remainingYards / flightYards;
-    const heightYards = Math.max(
-      0.08,
-      4 * peakHeightYards * args.disc.glide * 0.22 * flown01 * (1 - flown01),
-    );
+    const heightYards = throwHeightYards(peakHeightYards, flown01);
     const point = { xYards, yYards, heightYards };
     path.push(point);
 
-    const yardsToBasket = distanceYards(point, args.courseHole.basket);
-    if (yardsToBasket <= BASKET_CATCH_RADIUS_YARDS && !hasEnteredBasket) {
+    if (
+      !hasEnteredBasket &&
+      discCanCatchBasket({
+        point,
+        remainingYards,
+        discId: args.disc.id,
+        basket: args.courseHole.basket,
+      })
+    ) {
       hasEnteredBasket = true;
-      const catchRemainingYards =
-        args.disc.id === "target"
-          ? TARGET_BASKET_CATCH_MAX_REMAINING_YARDS
-          : BASKET_CATCH_MAX_REMAINING_YARDS;
-      if (remainingYards <= catchRemainingYards) {
-        path.push({ ...args.courseHole.basket, heightYards: 0.9 });
-        return {
-          landing: args.courseHole.basket,
-          rest: args.courseHole.basket,
-          travelYards: distanceYards(args.lie, args.courseHole.basket),
-          surfaceAtRest: "basket",
-          isInBasket: true,
-          tookWaterPenalty: false,
-          hitTree: false,
-          treePoint: null,
-          displayPath: path,
-        };
-      }
-      remainingYards *= 0.45;
+      path.push({
+        ...args.courseHole.basket,
+        heightYards: 3.6,
+      });
+      return {
+        landing: args.courseHole.basket,
+        rest: args.courseHole.basket,
+        travelYards: distanceYards(args.lie, args.courseHole.basket),
+        surfaceAtRest: "basket",
+        isInBasket: true,
+        tookWaterPenalty: false,
+        hitTree: false,
+        treePoint: null,
+        displayPath: path,
+      };
     }
 
     if (path.length > 220) {
@@ -357,7 +364,7 @@ function simulateDiscFlight(args: {
       : skip;
   const isInBasket =
     distanceYards(rest, args.courseHole.basket) <= BASKET_CATCH_RADIUS_YARDS;
-  path.push({ ...rest, heightYards: isInBasket ? 0.9 : 0.08 });
+  path.push({ ...rest, heightYards: isInBasket ? 3.6 : 0.08 });
 
   return {
     landing,
@@ -372,6 +379,49 @@ function simulateDiscFlight(args: {
     treePoint: null,
     displayPath: path,
   };
+}
+
+function throwPeakHeightYards(args: {
+  flightYards: number;
+  loftDegrees: number;
+  glide: number;
+}): number {
+  const launchRadians = (Math.max(14, args.loftDegrees) * Math.PI) / 180;
+  const loftPeakYards =
+    (args.flightYards * Math.tan(launchRadians)) / 2.6;
+  const glideScale = 0.72 + args.glide * 0.07;
+  return Math.min(
+    MAX_THROW_PEAK_HEIGHT_YARDS,
+    Math.max(MIN_THROW_PEAK_HEIGHT_YARDS, loftPeakYards * glideScale),
+  );
+}
+
+function throwHeightYards(peakHeightYards: number, flown01: number): number {
+  const hold01 = Math.min(1, Math.max(0, flown01) * 0.9);
+  return Math.max(0.12, peakHeightYards * Math.sin(Math.PI * hold01));
+}
+
+export function discCanCatchBasket(args: {
+  point: FlightPointYards;
+  remainingYards: number;
+  discId: DiscGolfDisc["id"];
+  basket: CoursePointYards;
+}): boolean {
+  const groundYards = distanceYards(args.point, args.basket);
+  if (groundYards > BASKET_CATCH_RADIUS_YARDS) {
+    return false;
+  }
+  if (
+    args.point.heightYards < BASKET_CHAIN_MIN_HEIGHT_YARDS ||
+    args.point.heightYards > BASKET_CHAIN_MAX_HEIGHT_YARDS
+  ) {
+    return false;
+  }
+  const catchRemainingYards =
+    args.discId === "target"
+      ? TARGET_BASKET_CATCH_MAX_REMAINING_YARDS
+      : BASKET_CATCH_MAX_REMAINING_YARDS;
+  return args.remainingYards <= catchRemainingYards;
 }
 
 export function pointAlongHeading(

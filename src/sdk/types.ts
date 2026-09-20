@@ -43,6 +43,7 @@ export type DamperSettings = {
 export type SpringSettings = {
   stiffnessPercent: number;
   dampingPercent: number;
+  deadbandDegrees?: number;
 };
 
 export type DetentSettings = {

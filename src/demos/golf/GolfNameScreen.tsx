@@ -64,7 +64,8 @@ export function GolfNameScreen(props: {
         <p className="course-welcome-controls">
           Play with your knob, mouse, or keyboard.
           <br />
-          <kbd>← →</kbd> Aim <kbd>SPACE</kbd> Hold and release
+          <kbd>A</kbd> Aim <kbd>C</kbd> Clubs <kbd>S</kbd> Swing <kbd>Z</kbd>{" "}
+          Draw <kbd>X</kbd> Fade
         </p>
         <GolfLeaderboardTable
           entries={props.leaderboard}

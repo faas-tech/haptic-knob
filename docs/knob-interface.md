@@ -74,10 +74,10 @@ The Mode Selector warns that large jumps in stiffness or damping can make the kn
 
 ## What this means for the ruler
 
-The official detent command cannot draw four click strengths at once. The lab therefore:
+The official detent command cannot draw several click strengths at once. The lab therefore:
 
-1. Uses 16 detents per revolution (one sixteenth-inch click if one turn is one inch).
+1. Uses 16 detents per revolution. Each click is 1/16 inch and 22.5 degrees wide.
 2. Maps unwrapped angle to 0-12 inches on screen.
-3. Sends a new `detent k= b=` when the nearest mark type changes.
+3. Writes `detent k= b=` late in a gap for the next sixteenth, eighth, quarter, half, or inch. The reading steps one sixteenth at a time. A new write waits 180 ms.
 
 If a later `help` reply or ECM document adds per-detent strength or endstops, put those commands in `src/sdk/commands.ts` and update this file.

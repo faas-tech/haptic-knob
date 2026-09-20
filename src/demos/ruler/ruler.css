@@ -279,6 +279,9 @@
 .ruler-scale-tick-sixteenth {
   height: 23px;
 }
+.ruler-scale-tick-eighth {
+  height: 30px;
+}
 .ruler-scale-tick-quarter {
   height: 38px;
 }
@@ -519,7 +522,7 @@
 }
 .ruler-strength-levels {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
 }
 .ruler-strength-levels > div {
@@ -561,6 +564,9 @@
   height: 12px;
 }
 .ruler-strength-bars i:nth-child(4) {
+  height: 14px;
+}
+.ruler-strength-bars i:nth-child(5) {
   height: 16px;
 }
 .ruler-strength-bars i.is-filled {

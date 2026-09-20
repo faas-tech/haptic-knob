@@ -3,6 +3,9 @@ export {
   applyModeNone,
   disableKnobMotor,
   enableKnobMotor,
+  enterHapticMode,
+  writeDetentSettings,
+  writeSpringSettings,
 } from "./applyHapticMode";
 export {
   damperSettingsCommand,
@@ -10,6 +13,7 @@ export {
   hapticModeCommand,
   KNOB_COMMANDS,
   springSettingsCommand,
+  terminatedKnobCommandLine,
 } from "./commands";
 export {
   connectSmartKnob,

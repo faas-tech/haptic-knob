@@ -43,17 +43,34 @@ export async function applyHapticMode(
     return modeCommandReply;
   }
 
-  if (modeName === "damper") {
-    return sendKnobCommand(
-      damperSettingsCommand(settings as DamperSettings),
-    );
-  }
+  const settingsCommand =
+    modeName === "damper"
+      ? damperSettingsCommand(settings as DamperSettings)
+      : modeName === "spring"
+        ? springSettingsCommand(settings as SpringSettings)
+        : detentSettingsCommand(settings as DetentSettings);
+  return sendKnobCommand(settingsCommand);
+}
 
-  if (modeName === "spring") {
-    return sendKnobCommand(springSettingsCommand(settings as SpringSettings));
-  }
+export async function enterHapticMode(
+  sendKnobCommand: SendKnobCommand,
+  modeName: HapticModeName,
+): Promise<KnobCommandReply> {
+  return sendKnobCommand(hapticModeCommand(modeName));
+}
 
-  return sendKnobCommand(detentSettingsCommand(settings as DetentSettings));
+export async function writeSpringSettings(
+  sendKnobCommand: SendKnobCommand,
+  settings: SpringSettings,
+): Promise<KnobCommandReply> {
+  return sendKnobCommand(springSettingsCommand(settings));
+}
+
+export async function writeDetentSettings(
+  sendKnobCommand: SendKnobCommand,
+  settings: DetentSettings,
+): Promise<KnobCommandReply> {
+  return sendKnobCommand(detentSettingsCommand(settings));
 }
 
 export async function applyModeNone(

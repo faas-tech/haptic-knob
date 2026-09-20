@@ -1,3 +1,4 @@
+import { terminatedKnobCommandLine } from "./commands";
 import { parseCommandReply } from "./parseReplies";
 import {
   NORDIC_UART_NOTIFY_CHARACTERISTIC_ID,
@@ -59,8 +60,16 @@ export async function connectSmartKnob(options: {
         resolve: (reply: KnobCommandReply) => void;
         lines: string[];
         timer: number;
+        generation: number;
       }
     | null = null;
+  let commandReplyGeneration = 0;
+  const waitingCommands: Array<{
+    command: string;
+    timeoutMs: number;
+    resolve: (reply: KnobCommandReply) => void;
+  }> = [];
+  let isSendingCommand = false;
 
   const deliverReplyLine = (line: string) => {
     const cleanedLine = line.replace(/\0/g, "").trim();
@@ -83,13 +92,14 @@ export async function connectSmartKnob(options: {
     if (pendingCommandReply) {
       window.clearTimeout(pendingCommandReply.timer);
       const replyBody = pendingCommandReply.lines.join("\n");
-      pendingCommandReply.resolve({
+      const pending = pendingCommandReply;
+      pendingCommandReply = null;
+      pending.resolve({
         sent: true,
         confirmed: parsedReply.confirmed,
         error: parsedReply.error,
         replyBody: replyBody || null,
       });
-      pendingCommandReply = null;
     }
   };
 
@@ -114,7 +124,77 @@ export async function connectSmartKnob(options: {
   });
 
   const writeCommandLine = async (line: string) => {
-    await writeCharacteristic.writeValue(new TextEncoder().encode(line));
+    await writeCharacteristic.writeValue(
+      new TextEncoder().encode(terminatedKnobCommandLine(line)),
+    );
+  };
+
+  const sendQueuedCommand = (command: string, timeoutMs: number) =>
+    new Promise<KnobCommandReply>((resolve) => {
+      commandReplyGeneration += 1;
+      const generation = commandReplyGeneration;
+      pendingCommandReply = {
+        generation,
+        lines: [],
+        resolve: (reply) => {
+          resolve(reply);
+          isSendingCommand = false;
+          void sendNextWaitingCommand();
+        },
+        timer: window.setTimeout(() => {
+          if (
+            pendingCommandReply == null ||
+            pendingCommandReply.generation !== generation
+          ) {
+            return;
+          }
+          pendingCommandReply = null;
+          resolve({
+            sent: true,
+            confirmed: false,
+            error: { code: -2, message: "Timed out waiting for ok" },
+            replyBody: null,
+          });
+          isSendingCommand = false;
+          window.setTimeout(() => {
+            void sendNextWaitingCommand();
+          }, 80);
+        }, timeoutMs),
+      };
+
+      writeCommandLine(command).catch((error: unknown) => {
+        if (pendingCommandReply) {
+          window.clearTimeout(pendingCommandReply.timer);
+          pendingCommandReply = null;
+        }
+        resolve({
+          sent: false,
+          confirmed: false,
+          error: {
+            code: -3,
+            message: error instanceof Error ? error.message : "Write failed",
+          },
+          replyBody: null,
+        });
+        isSendingCommand = false;
+        void sendNextWaitingCommand();
+      });
+    });
+
+  const sendNextWaitingCommand = async () => {
+    if (isSendingCommand || waitingCommands.length === 0) {
+      return;
+    }
+    const nextCommand = waitingCommands.shift();
+    if (!nextCommand) {
+      return;
+    }
+    isSendingCommand = true;
+    const reply = await sendQueuedCommand(
+      nextCommand.command,
+      nextCommand.timeoutMs,
+    );
+    nextCommand.resolve(reply);
   };
 
   return {
@@ -122,45 +202,12 @@ export async function connectSmartKnob(options: {
     writeCommandLine,
     sendKnobCommandAndWaitForOk: (command, timeoutMs = 3000) =>
       new Promise((resolve) => {
-        if (pendingCommandReply) {
-          window.clearTimeout(pendingCommandReply.timer);
-          pendingCommandReply.resolve({
-            sent: false,
-            confirmed: false,
-            error: { code: -1, message: "Replaced by a newer command" },
-            replyBody: null,
-          });
-        }
-
-        pendingCommandReply = {
-          lines: [],
+        waitingCommands.push({
+          command,
+          timeoutMs,
           resolve,
-          timer: window.setTimeout(() => {
-            pendingCommandReply = null;
-            resolve({
-              sent: true,
-              confirmed: false,
-              error: { code: -2, message: "Timed out waiting for ok" },
-              replyBody: null,
-            });
-          }, timeoutMs),
-        };
-
-        writeCommandLine(command).catch((error: unknown) => {
-          if (pendingCommandReply) {
-            window.clearTimeout(pendingCommandReply.timer);
-            pendingCommandReply = null;
-          }
-          resolve({
-            sent: false,
-            confirmed: false,
-            error: {
-              code: -3,
-              message: error instanceof Error ? error.message : "Write failed",
-            },
-            replyBody: null,
-          });
         });
+        void sendNextWaitingCommand();
       }),
     subscribeToReplyLines: (listener) => {
       replyLineListeners.add(listener);

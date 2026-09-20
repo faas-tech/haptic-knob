@@ -18,7 +18,7 @@ export const BUILT_IN_LAB_APPS: LabApp[] = [
   {
     id: "ruler",
     title: "12-inch ruler",
-    tagline: "Different click strength at quarter, half, and full inch.",
+    tagline: "Click strength rises from sixteenth to inch.",
     status: "ready",
     route: "/ruler",
     tileImageSrc: rulerTileImageSrc,

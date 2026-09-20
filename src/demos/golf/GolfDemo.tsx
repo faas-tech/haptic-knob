@@ -28,28 +28,38 @@ import {
   previousSwingClubId,
   PUTTER,
   SWING_CLUBS,
+  swingClubAfterDetentSteps,
   swingClubAtDetentIndex,
   type SwingClubId,
   type ClubId,
 } from "./golfClubs";
 import {
   courseHoleByNumber,
-  headingDegreesToCup,
   isBallOnGreen,
   NINE_HOLE_COURSE,
+  startingAimHeadingDegrees,
   surfaceAtPosition,
   type CoursePointYards,
 } from "./golfCourse";
 import {
   clampPower,
+  FULL_WIND_DEGREES,
   liePowerLabel,
+  MINIMUM_SHOT_POWER,
   playGolfShot,
+  previewGolfShotPath,
+  puttPowerFromHold01,
+  shotShapeLabel,
+  swingFromKnobDelta,
   swingPowerFromHold01,
 } from "./golfShot";
 import { rollCourseWind } from "./golfWind";
 
-const FULL_WIND_DEGREES = 90;
-const CLUB_DETENT_DEGREES = 18;
+const DIRECTION_DETENT_COUNT = 36;
+const CLUB_DETENT_COUNT = 16;
+const CLUB_DETENT_SPACING_DEGREES = 360 / CLUB_DETENT_COUNT;
+const HAPTIC_SETTLE_MS = 220;
+const SWING_RELEASE_RETURN_DEGREES = 2;
 const WIND_KEY_SECONDS = 1.4;
 const AIM_DEGREES_PER_KNOB_DEGREE = 0.35;
 const HOLE_FLYOVER_MS = 5000;
@@ -74,10 +84,14 @@ export function GolfDemo(props: {
     courseHole.tee,
   );
   const [headingDegrees, setHeadingDegrees] = useState(() =>
-    headingDegreesToCup(courseHole.tee, courseHole.cup),
+    startingAimHeadingDegrees(courseHole, courseHole.tee),
   );
   const [swingClubId, setSwingClubId] = useState<SwingClubId>("five-iron");
   const [swingPower, setSwingPower] = useState(0);
+  const [swingShape01, setSwingShape01] = useState(0);
+  const [windAimSide, setWindAimSide] = useState<
+    "draw" | "fade" | "straight" | null
+  >(null);
   const [playMode, setPlayMode] = useState<GolfPlayMode>("direction");
   const [courseWind, setCourseWind] = useState(rollCourseWind);
   const [strokesThisHole, setStrokesThisHole] = useState(0);
@@ -130,10 +144,66 @@ export function GolfDemo(props: {
     courseHole.cup.xYards - ball.xYards,
     courseHole.cup.yYards - ball.yYards,
   );
+  const previewCarryYards =
+    selectedClub.id === "putter"
+      ? swingPower > 0.03
+        ? selectedClub.puttYards * swingPower
+        : yardsToCup
+      : selectedClub.carryYards * (swingPower > 0.03 ? swingPower : 0.85);
+  const drawAimPath = useMemo(
+    () =>
+      previewGolfShotPath({
+        ball,
+        headingDegrees,
+        loftDegrees: selectedClub.loftDegrees,
+        carryYards: previewCarryYards,
+        shape01: -0.85,
+        pointCount: 33,
+      }),
+    [ball, headingDegrees, previewCarryYards, selectedClub.loftDegrees],
+  );
+  const fadeAimPath = useMemo(
+    () =>
+      previewGolfShotPath({
+        ball,
+        headingDegrees,
+        loftDegrees: selectedClub.loftDegrees,
+        carryYards: previewCarryYards,
+        shape01: 0.85,
+        pointCount: 33,
+      }),
+    [ball, headingDegrees, previewCarryYards, selectedClub.loftDegrees],
+  );
+  const estimateAimPath = useMemo(
+    () =>
+      previewGolfShotPath({
+        ball,
+        headingDegrees,
+        loftDegrees: selectedClub.loftDegrees,
+        carryYards: previewCarryYards,
+        shape01: selectedClub.id === "putter" ? 0 : swingShape01,
+        pointCount: 33,
+      }),
+    [
+      ball,
+      headingDegrees,
+      previewCarryYards,
+      selectedClub.id,
+      selectedClub.loftDegrees,
+      swingShape01,
+    ],
+  );
+  const visibleAimSide = visibleAimSideForSwing(windAimSide, swingShape01);
+  const showShapeGhosts =
+    playMode === "swing" &&
+    windAimSide == null &&
+    Math.abs(swingShape01) < 0.04;
 
   const unwrappedDegreesRef = useRef<number | null>(null);
   const addressDegreesRef = useRef<number | null>(null);
   const headingAtAimStartRef = useRef(headingDegrees);
+  const headingDegreesRef = useRef(headingDegrees);
+  headingDegreesRef.current = headingDegrees;
   const peakSwingRef = useRef(0);
   const lastDeltaRef = useRef(0);
   const appliedFeelRef = useRef<string | null>(null);
@@ -143,10 +213,20 @@ export function GolfDemo(props: {
   const spaceStartedAtRef = useRef(0);
   const playModeRef = useRef(playMode);
   playModeRef.current = playMode;
+  const swingClubIdRef = useRef(swingClubId);
+  swingClubIdRef.current = swingClubId;
+  const clubAtSelectStartRef = useRef<SwingClubId>(swingClubId);
+  const ignoreKnobInputUntilMsRef = useRef(0);
+  const peakShape01Ref = useRef(0);
+  const keyboardWindSideRef = useRef<"draw" | "fade" | "straight" | null>(
+    null,
+  );
   const swingPowerRef = useRef(swingPower);
   swingPowerRef.current = swingPower;
   const enableGolfMotorRef = useRef<() => Promise<void>>(async () => {});
-  const hitShotRef = useRef<(power: number) => void>(() => {});
+  const hitShotRef = useRef<(power: number, shape01?: number) => void>(
+    () => {},
+  );
   const hasSavedRoundRef = useRef(false);
   const holeOutTimerRef = useRef<number | null>(null);
 
@@ -166,16 +246,20 @@ export function GolfDemo(props: {
     setDisplayBall(nextHole.tee);
     setBallSink01(0);
     setMadeCallout(null);
-    const pinHeadingDegrees = headingDegreesToCup(nextHole.tee, nextHole.cup);
-    setHeadingDegrees(pinHeadingDegrees);
-    headingAtAimStartRef.current = pinHeadingDegrees;
+    const teeHeadingDegrees = startingAimHeadingDegrees(nextHole, nextHole.tee);
+    setHeadingDegrees(teeHeadingDegrees);
+    headingAtAimStartRef.current = teeHeadingDegrees;
     setSwingPower(0);
+    setSwingShape01(0);
+    setWindAimSide(null);
     setStrokesThisHole(0);
     setIsHoleComplete(false);
     setCourseWind(rollCourseWind());
     setPlayMode("direction");
     peakSwingRef.current = 0;
     addressDegreesRef.current = null;
+    peakShape01Ref.current = 0;
+    keyboardWindSideRef.current = null;
     appliedFeelRef.current = null;
   };
 
@@ -265,20 +349,17 @@ export function GolfDemo(props: {
     const step = (now: number) => {
       const t = Math.min(1, (now - startedAt) / durationMs);
       const ease = 1 - (1 - t) ** 2;
-      const position = pointAlongDisplayPath(path, ease);
-      setDisplayBall(position);
-      const traveledYards = Math.hypot(
-        position.xYards - start.xYards,
-        position.yYards - start.yYards,
-      );
+      const alongPath = pointAlongDisplayPath(path, ease);
+      setDisplayBall(alongPath.point);
       const flightProgress01 = Math.min(
         1,
-        traveledYards / Math.max(0.01, carryYards),
+        alongPath.alongYards / Math.max(0.01, carryYards),
       );
       const peakHeightYards =
         (carryYards * Math.tan((loftDegrees * Math.PI) / 180)) / 4;
+      const isRolling = alongPath.alongYards > carryYards + 0.05;
       setBallHeightYards(
-        isPutt
+        isPutt || isRolling
           ? 0
           : 4 * peakHeightYards * flightProgress01 * (1 - flightProgress01),
       );
@@ -310,18 +391,19 @@ export function GolfDemo(props: {
     shotAnimationFrameRef.current = window.requestAnimationFrame(step);
   };
 
-  const hitShot = (power: number) => {
+  const hitShot = (power: number, shape01 = 0) => {
     if (!canPlay || isAnimatingShotRef.current) {
       return;
     }
     const shotPower = clampPower(power);
-    if (shotPower < 0.04) {
+    if (shotPower < MINIMUM_SHOT_POWER) {
       setOperatorMessage("Wind farther, then release.");
       return;
     }
 
     setShotResultBanner(null);
     setShotClubId(selectedClub.id);
+    const shotShape01 = selectedClub.id === "putter" ? 0 : shape01;
     const shot = playGolfShot({
       courseHole,
       ball,
@@ -330,11 +412,16 @@ export function GolfDemo(props: {
       headingDegrees,
       power: shotPower,
       courseWind,
+      shape01: shotShape01,
     });
     const nextStrokes = strokesThisHole + 1 + (shot.tookWaterPenalty ? 1 : 0);
     setStrokesThisHole(nextStrokes);
     setSwingPower(0);
+    setSwingShape01(0);
+    setWindAimSide(null);
     peakSwingRef.current = 0;
+    peakShape01Ref.current = 0;
+    keyboardWindSideRef.current = null;
     addressDegreesRef.current = null;
 
     setBall(shot.rest);
@@ -354,6 +441,7 @@ export function GolfDemo(props: {
           bannerKey: Date.now(),
           powerPercent: Math.round(shotPower * 100),
           travelYards: Math.round(shot.travelYards),
+          shapeLabel: shotShapeLabel(shotShape01),
         });
       }
 
@@ -387,10 +475,14 @@ export function GolfDemo(props: {
 
       setDisplayBall(shot.rest);
       isAnimatingShotRef.current = false;
-      const pinHeadingDegrees = headingDegreesToCup(shot.rest, courseHole.cup);
-      setHeadingDegrees(pinHeadingDegrees);
-      headingAtAimStartRef.current = pinHeadingDegrees;
+      const nextAimHeadingDegrees = startingAimHeadingDegrees(
+        courseHole,
+        shot.rest,
+      );
+      setHeadingDegrees(nextAimHeadingDegrees);
+      headingAtAimStartRef.current = nextAimHeadingDegrees;
       setPlayMode("direction");
+      applyFeelForPlayMode("direction");
       if (shot.tookWaterPenalty) {
         setOperatorMessage(
           "Water. One penalty stroke. Ball is back on the last dry lie.",
@@ -403,8 +495,8 @@ export function GolfDemo(props: {
       }
       setOperatorMessage(
         shot.surfaceAtRest === "green"
-          ? "On the green. Putter is locked. Hold to swing for your putt."
-          : `${selectedClub.name} · ${liePowerLabel(shot.surfaceAtRest)}. Aim, then hold to swing.`,
+          ? "On the green. Putter is locked. A aims. S putts with the spring."
+          : `${selectedClub.name} · ${liePowerLabel(shot.surfaceAtRest)}. A aims. C picks a club. S swings.`,
       );
     };
 
@@ -420,46 +512,128 @@ export function GolfDemo(props: {
     );
   };
 
-  const applyFeelForPlayMode = (nextMode: GolfPlayMode) => {
+  const beginHapticSettle = () => {
+    ignoreKnobInputUntilMsRef.current = performance.now() + HAPTIC_SETTLE_MS;
+    addressDegreesRef.current = null;
+    lastDeltaRef.current = 0;
+    peakSwingRef.current = 0;
+    peakShape01Ref.current = 0;
+    setSwingPower(0);
+    setSwingShape01(0);
+  };
+
+  const applyFeelForPlayMode = async (
+    nextMode: GolfPlayMode,
+    options?: { forceWrite?: boolean },
+  ) => {
     if (!props.isConnected || !isMotorEnabled) {
       return;
     }
-    const feelKey = nextMode === "direction" ? "direction-damper" : "shoot";
-    if (appliedFeelRef.current === feelKey) {
+    const feelKey =
+      nextMode === "direction"
+        ? "direction-detent"
+        : nextMode === "club"
+          ? "club-detent"
+          : isOnGreen
+            ? "putt-spring"
+            : "swing-spring";
+    if (!options?.forceWrite && appliedFeelRef.current === feelKey) {
+      return;
+    }
+    clubAtSelectStartRef.current = swingClubIdRef.current;
+    const feelReply =
+      nextMode === "direction"
+        ? await applyHapticMode(props.sendKnobCommand, "detent", {
+            detentCount: DIRECTION_DETENT_COUNT,
+            stiffnessPercent: 22,
+            dampingPercent: 14,
+          })
+        : nextMode === "club"
+          ? await applyHapticMode(props.sendKnobCommand, "detent", {
+              detentCount: CLUB_DETENT_COUNT,
+              stiffnessPercent: 28,
+              dampingPercent: 16,
+            })
+          : await applyHapticMode(props.sendKnobCommand, "spring", {
+              stiffnessPercent: isOnGreen ? 16 : 26,
+              dampingPercent: isOnGreen ? 38 : 28,
+            });
+    if (!feelReply.confirmed) {
+      setOperatorMessage(
+        `Feel did not confirm: ${feelReply.error?.message ?? "no reply"}`,
+      );
       return;
     }
     appliedFeelRef.current = feelKey;
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
-    if (nextMode === "direction") {
-      void applyHapticMode(props.sendKnobCommand, "damper", {
-        dampingPercent: 38,
-      });
-      return;
-    }
-    if (isOnGreen) {
-      void applyHapticMode(props.sendKnobCommand, "spring", {
-        stiffnessPercent: 32,
-        dampingPercent: 28,
-      });
-      return;
-    }
-    void applyHapticMode(props.sendKnobCommand, "detent", {
-      detentCount: 5,
-      stiffnessPercent: 28,
-      dampingPercent: 18,
-    });
+    beginHapticSettle();
   };
 
   const selectPlayMode = (nextMode: GolfPlayMode) => {
     if (isAnimatingShotRef.current) return;
+    if (nextMode === "club" && isOnGreen) {
+      setOperatorMessage("Putter is locked on the green.");
+      return;
+    }
+    if (nextMode === playModeRef.current) {
+      if (nextMode === "direction") {
+        void applyFeelForPlayMode("direction", { forceWrite: true });
+      }
+      return;
+    }
+    if (nextMode === "direction") {
+      headingAtAimStartRef.current = headingDegreesRef.current;
+    }
     setPlayMode(nextMode);
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
+    clubAtSelectStartRef.current = swingClubIdRef.current;
     peakSwingRef.current = 0;
+    peakShape01Ref.current = 0;
     setSwingPower(0);
-    applyFeelForPlayMode(nextMode);
-    setOperatorMessage("");
+    setSwingShape01(0);
+    setWindAimSide(null);
+    void applyFeelForPlayMode(nextMode);
+    setOperatorMessage(
+      nextMode === "direction"
+        ? "Fine detents aim at the pin."
+        : nextMode === "club"
+          ? "Turn either way to change clubs."
+          : isOnGreen
+            ? "Wind the spring, then let it back to putt."
+            : "Right winds a fade. Left winds a draw. Let the spring back to hit.",
+    );
+  };
+
+  const beginKeyboardWind = (side: "draw" | "fade" | "straight") => {
+    if (keyboardWindSideRef.current) {
+      return;
+    }
+    if (playModeRef.current !== "swing") {
+      selectPlayMode("swing");
+    }
+    spaceHeldRef.current = true;
+    spaceStartedAtRef.current = performance.now();
+    keyboardWindSideRef.current = side;
+    setWindAimSide(side);
+    peakSwingRef.current = 0;
+    peakShape01Ref.current = 0;
+    setSwingPower(0);
+    setSwingShape01(shape01ForWindSide(side, 0));
+  };
+
+  const releaseKeyboardWind = () => {
+    spaceHeldRef.current = false;
+    if (roundPhase !== "play" || isAnimatingShotRef.current) {
+      keyboardWindSideRef.current = null;
+      return;
+    }
+    const power = peakSwingRef.current;
+    const shape01 = peakShape01Ref.current;
+    peakSwingRef.current = 0;
+    peakShape01Ref.current = 0;
+    keyboardWindSideRef.current = null;
+    setSwingPower(0);
+    setSwingShape01(0);
+    setWindAimSide(null);
+    hitShot(power, shape01);
   };
 
   const enableGolfMotor = async () => {
@@ -474,51 +648,10 @@ export function GolfDemo(props: {
     await props.sendKnobCommand(KNOB_COMMANDS.startPositionStream50);
     setIsMotorEnabled(true);
     appliedFeelRef.current = null;
-    addressDegreesRef.current = null;
-    headingAtAimStartRef.current = headingDegrees;
-    if (playMode === "direction") {
-      appliedFeelRef.current = "direction-damper";
-      await applyHapticMode(props.sendKnobCommand, "damper", {
-        dampingPercent: 38,
-      });
-    } else if (isOnGreen) {
-      appliedFeelRef.current = "shoot-swing";
-      await applyHapticMode(props.sendKnobCommand, "spring", {
-        stiffnessPercent: 32,
-        dampingPercent: 28,
-      });
-    } else {
-      appliedFeelRef.current = "shoot-club";
-      await applyHapticMode(props.sendKnobCommand, "detent", {
-        detentCount: 5,
-        stiffnessPercent: 28,
-        dampingPercent: 18,
-      });
-    }
-    setOperatorMessage("Motor on. Use Direction to aim, Shoot to swing.");
-  };
-
-  const applyFeelForShootSide = (side: "club" | "swing") => {
-    if (!props.isConnected || !isMotorEnabled) {
-      return;
-    }
-    const feelKey = `shoot-${side}`;
-    if (appliedFeelRef.current === feelKey) {
-      return;
-    }
-    appliedFeelRef.current = feelKey;
-    if (side === "club") {
-      void applyHapticMode(props.sendKnobCommand, "detent", {
-        detentCount: 5,
-        stiffnessPercent: 28,
-        dampingPercent: 18,
-      });
-      return;
-    }
-    void applyHapticMode(props.sendKnobCommand, "spring", {
-      stiffnessPercent: 32,
-      dampingPercent: 28,
-    });
+    await applyFeelForPlayMode(playModeRef.current);
+    setOperatorMessage(
+      "Motor on. A aims. C turns through clubs. S winds a fade or a draw.",
+    );
   };
 
   useEffect(() => {
@@ -545,10 +678,21 @@ export function GolfDemo(props: {
   }, [roundPhase, flyoverGeneration]);
 
   useEffect(() => {
+    if (roundPhase !== "play" || !isMotorEnabled) {
+      return;
+    }
+    void applyFeelForPlayMode(playModeRef.current);
+  }, [roundPhase, holeNumber, isMotorEnabled]);
+
+  useEffect(() => {
     const cancelCharge = () => {
       spaceHeldRef.current = false;
+      keyboardWindSideRef.current = null;
       peakSwingRef.current = 0;
+      peakShape01Ref.current = 0;
       setSwingPower(0);
+      setSwingShape01(0);
+      setWindAimSide(null);
     };
     window.addEventListener("blur", cancelCharge);
     return () => {
@@ -560,9 +704,10 @@ export function GolfDemo(props: {
   }, []);
 
   useEffect(() => {
+    const streamSample = props.latestStreamSample;
     if (
       !canPlay ||
-      !props.latestStreamSample ||
+      !streamSample ||
       !isMotorEnabled ||
       isAnimatingShotRef.current
     ) {
@@ -571,8 +716,17 @@ export function GolfDemo(props: {
 
     unwrappedDegreesRef.current = unwrapAngleDegrees(
       unwrappedDegreesRef.current,
-      props.latestStreamSample.positionDegrees,
+      streamSample.positionDegrees,
     );
+
+    if (performance.now() < ignoreKnobInputUntilMsRef.current) {
+      return;
+    }
+
+    if (keyboardWindSideRef.current) {
+      return;
+    }
+
     if (addressDegreesRef.current == null) {
       addressDegreesRef.current = unwrappedDegreesRef.current;
     }
@@ -581,6 +735,7 @@ export function GolfDemo(props: {
       unwrappedDegreesRef.current - addressDegreesRef.current;
 
     if (playModeRef.current === "direction") {
+      lastDeltaRef.current = deltaDegrees;
       setHeadingDegrees(
         headingAtAimStartRef.current +
           deltaDegrees * AIM_DEGREES_PER_KNOB_DEGREE,
@@ -588,49 +743,52 @@ export function GolfDemo(props: {
       return;
     }
 
-    const returningTowardAddress =
-      Math.abs(deltaDegrees) < Math.abs(lastDeltaRef.current) - 2;
-    lastDeltaRef.current = deltaDegrees;
-
-    if (isOnGreen || isHoleComplete) {
-      applyFeelForShootSide("swing");
-      const puttPower = swingPowerFromHold01(
-        Math.max(0, deltaDegrees) / FULL_WIND_DEGREES,
+    if (playModeRef.current === "club") {
+      lastDeltaRef.current = deltaDegrees;
+      const detentSteps = Math.round(
+        deltaDegrees / CLUB_DETENT_SPACING_DEGREES,
       );
-      peakSwingRef.current = Math.max(peakSwingRef.current, puttPower);
-      setSwingPower(puttPower);
-      if (returningTowardAddress && peakSwingRef.current > 0.08) {
-        const power = peakSwingRef.current;
-        peakSwingRef.current = 0;
-        hitShot(power);
-      }
+      setSwingClubId(
+        swingClubAfterDetentSteps(clubAtSelectStartRef.current, detentSteps),
+      );
       return;
     }
 
-    if (deltaDegrees < -6) {
-      applyFeelForShootSide("club");
-      const detentIndex = Math.min(
-        4,
-        Math.floor((-deltaDegrees - 6) / CLUB_DETENT_DEGREES),
-      );
-      setSwingClubId(swingClubAtDetentIndex(detentIndex).id as SwingClubId);
-      setSwingPower(0);
+    const nextSwing = isOnGreen
+      ? {
+          power: puttPowerFromHold01(
+            Math.abs(deltaDegrees) / FULL_WIND_DEGREES,
+          ),
+          shape01: 0,
+        }
+      : swingFromKnobDelta(deltaDegrees);
+    const signedWindDegrees = deltaDegrees;
+    const returningTowardCenter =
+      Math.abs(signedWindDegrees) <
+      Math.abs(lastDeltaRef.current) - SWING_RELEASE_RETURN_DEGREES;
+    lastDeltaRef.current = signedWindDegrees;
+    peakSwingRef.current = Math.max(peakSwingRef.current, nextSwing.power);
+    if (nextSwing.power >= MINIMUM_SHOT_POWER) {
+      peakShape01Ref.current = nextSwing.shape01;
+    }
+    setSwingPower(nextSwing.power);
+    setSwingShape01(nextSwing.shape01);
+    setWindAimSide(
+      nextSwing.shape01 < -0.04
+        ? "draw"
+        : nextSwing.shape01 > 0.04
+          ? "fade"
+          : null,
+    );
+    if (
+      returningTowardCenter &&
+      peakSwingRef.current >= MINIMUM_SHOT_POWER
+    ) {
+      const power = peakSwingRef.current;
+      const shape01 = peakShape01Ref.current;
       peakSwingRef.current = 0;
-      return;
-    }
-
-    if (deltaDegrees > 6) {
-      applyFeelForShootSide("swing");
-      const nextSwingPower = swingPowerFromHold01(
-        deltaDegrees / FULL_WIND_DEGREES,
-      );
-      peakSwingRef.current = Math.max(peakSwingRef.current, nextSwingPower);
-      setSwingPower(nextSwingPower);
-      if (returningTowardAddress && peakSwingRef.current > 0.08) {
-        const power = peakSwingRef.current;
-        peakSwingRef.current = 0;
-        hitShot(power);
-      }
+      peakShape01Ref.current = 0;
+      hitShot(power, shape01);
     }
   }, [props.latestStreamSample, isMotorEnabled, isOnGreen, isHoleComplete]);
 
@@ -644,8 +802,14 @@ export function GolfDemo(props: {
       }
       if (event.key === "a" || event.key === "A") {
         selectPlayMode("direction");
+      } else if (event.key === "c" || event.key === "C") {
+        selectPlayMode("club");
       } else if (event.key === "s" || event.key === "S") {
-        selectPlayMode("shoot");
+        selectPlayMode("swing");
+      } else if ((event.key === "z" || event.key === "Z") && !event.repeat) {
+        beginKeyboardWind("draw");
+      } else if ((event.key === "x" || event.key === "X") && !event.repeat) {
+        beginKeyboardWind("fade");
       } else if (event.key === "[" && !isOnGreen) {
         setSwingClubId((current) => previousSwingClubId(current));
       } else if (event.key === "]" && !isOnGreen) {
@@ -662,30 +826,28 @@ export function GolfDemo(props: {
         setHeadingDegrees((current) => current + 2);
       } else if (event.key === " " && !event.repeat) {
         event.preventDefault();
-        if (playModeRef.current !== "shoot") {
-          selectPlayMode("shoot");
-        }
-        spaceHeldRef.current = true;
-        spaceStartedAtRef.current = performance.now();
-        peakSwingRef.current = 0;
+        beginKeyboardWind("straight");
       } else if (event.key === "r" || event.key === "R") {
         resetHole(holeNumber);
+        void applyFeelForPlayMode("direction");
         setOperatorMessage(`Hole ${holeNumber} reset. New wind.`);
       }
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === " ") {
-        event.preventDefault();
-        spaceHeldRef.current = false;
-        if (roundPhase !== "play") {
-          return;
-        }
-        const power = peakSwingRef.current;
-        peakSwingRef.current = 0;
-        setSwingPower(0);
-        hitShot(power);
+      const heldSide = keyboardWindSideRef.current;
+      if (!heldSide) {
+        return;
       }
+      const releasedHeldSide =
+        (heldSide === "draw" && (event.key === "z" || event.key === "Z")) ||
+        (heldSide === "fade" && (event.key === "x" || event.key === "X")) ||
+        (heldSide === "straight" && event.key === " ");
+      if (!releasedHeldSide) {
+        return;
+      }
+      event.preventDefault();
+      releaseKeyboardWind();
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -715,8 +877,12 @@ export function GolfDemo(props: {
       if (spaceHeldRef.current) {
         const heldSeconds = (now - spaceStartedAtRef.current) / 1000;
         const power = swingPowerFromHold01(heldSeconds / WIND_KEY_SECONDS);
+        const side = keyboardWindSideRef.current ?? "straight";
+        const shape01 = shape01ForWindSide(side, power);
         peakSwingRef.current = power;
+        peakShape01Ref.current = shape01;
         setSwingPower(power);
+        setSwingShape01(shape01);
       }
       frame = window.requestAnimationFrame(tick);
     };
@@ -759,13 +925,7 @@ export function GolfDemo(props: {
         ball={displayBall}
         aimHeadingDegrees={headingDegrees}
         aimLoftDegrees={selectedClub.loftDegrees}
-        aimCarryYards={
-          selectedClub.id === "putter"
-            ? swingPower > 0.03
-              ? selectedClub.puttYards * swingPower
-              : yardsToCup
-            : selectedClub.carryYards * (swingPower > 0.03 ? swingPower : 1)
-        }
+        aimCarryYards={previewCarryYards}
         aimIsPutt={
           (isShotInFlight ? isPuttInFlight : selectedClub.id === "putter") &&
           ballSink01 === 0 &&
@@ -776,6 +936,11 @@ export function GolfDemo(props: {
         flyoverProgress01={flyoverProgress01}
         isShotInFlight={isShotInFlight}
         ballHeightYards={ballHeightYards}
+        estimateAimPath={estimateAimPath}
+        drawAimPath={drawAimPath}
+        fadeAimPath={fadeAimPath}
+        visibleAimSide={visibleAimSide}
+        showShapeGhosts={showShapeGhosts}
       />
       {roundPhase === "play" ? (
         <GolfPlayerDashboard
@@ -785,6 +950,7 @@ export function GolfDemo(props: {
           selectedClubId={displayedClub.id}
           isPutterLocked={displayedClub.id === "putter"}
           windPower={swingPower}
+          swingShape01={swingShape01}
           courseWind={courseWind}
           strokesThisHole={strokesThisHole}
           yardsToCup={Math.hypot(
@@ -811,25 +977,23 @@ export function GolfDemo(props: {
           onAimRight={() => setHeadingDegrees((current) => current + 2)}
           onCharge={() => {
             if (!canPlay || isAnimatingShotRef.current) return;
-            selectPlayMode("shoot");
-            spaceHeldRef.current = true;
-            spaceStartedAtRef.current = performance.now();
-            peakSwingRef.current = 0;
+            beginKeyboardWind("straight");
           }}
           onRelease={() => {
-            spaceHeldRef.current = false;
-            const power = peakSwingRef.current;
-            peakSwingRef.current = 0;
-            setSwingPower(0);
-            hitShot(power);
+            releaseKeyboardWind();
           }}
           onCancelCharge={() => {
             spaceHeldRef.current = false;
+            keyboardWindSideRef.current = null;
             peakSwingRef.current = 0;
+            peakShape01Ref.current = 0;
             setSwingPower(0);
+            setSwingShape01(0);
+            setWindAimSide(null);
           }}
           onSelectDirectionMode={() => selectPlayMode("direction")}
-          onSelectShootMode={() => selectPlayMode("shoot")}
+          onSelectClubMode={() => selectPlayMode("club")}
+          onSelectSwingMode={() => selectPlayMode("swing")}
         />
       ) : null}
       {madeCallout ? (
@@ -882,15 +1046,12 @@ export function GolfDemo(props: {
 function pointAlongDisplayPath(
   path: CoursePointYards[],
   progress01: number,
-): CoursePointYards {
+): { point: CoursePointYards; alongYards: number } {
   if (path.length === 0) {
-    return { xYards: 0, yYards: 0 };
+    return { point: { xYards: 0, yYards: 0 }, alongYards: 0 };
   }
   if (path.length === 1 || progress01 <= 0) {
-    return path[0];
-  }
-  if (progress01 >= 1) {
-    return path[path.length - 1];
+    return { point: path[0], alongYards: 0 };
   }
   let totalYards = 0;
   const segmentYards: number[] = [];
@@ -902,7 +1063,11 @@ function pointAlongDisplayPath(
     segmentYards.push(yards);
     totalYards += yards;
   }
+  if (progress01 >= 1) {
+    return { point: path[path.length - 1], alongYards: totalYards };
+  }
   let alongYards = totalYards * progress01;
+  const traveledYards = alongYards;
   for (let index = 0; index < segmentYards.length; index += 1) {
     if (
       alongYards <= segmentYards[index] ||
@@ -911,17 +1076,55 @@ function pointAlongDisplayPath(
       const t =
         segmentYards[index] === 0 ? 1 : alongYards / segmentYards[index];
       return {
-        xYards:
-          path[index].xYards +
-          (path[index + 1].xYards - path[index].xYards) * t,
-        yYards:
-          path[index].yYards +
-          (path[index + 1].yYards - path[index].yYards) * t,
+        point: {
+          xYards:
+            path[index].xYards +
+            (path[index + 1].xYards - path[index].xYards) * t,
+          yYards:
+            path[index].yYards +
+            (path[index + 1].yYards - path[index].yYards) * t,
+        },
+        alongYards: traveledYards,
       };
     }
     alongYards -= segmentYards[index];
   }
-  return path[path.length - 1];
+  return { point: path[path.length - 1], alongYards: totalYards };
+}
+
+function shape01ForWindSide(
+  side: "draw" | "fade" | "straight",
+  power: number,
+): number {
+  if (side === "draw") {
+    return -Math.max(0.2, power);
+  }
+  if (side === "fade") {
+    return Math.max(0.2, power);
+  }
+  return 0;
+}
+
+function visibleAimSideForSwing(
+  windAimSide: "draw" | "fade" | "straight" | null,
+  swingShape01: number,
+): "both" | "draw" | "fade" | "none" {
+  if (windAimSide === "draw") {
+    return "draw";
+  }
+  if (windAimSide === "fade") {
+    return "fade";
+  }
+  if (windAimSide === "straight") {
+    return "both";
+  }
+  if (swingShape01 < -0.04) {
+    return "draw";
+  }
+  if (swingShape01 > 0.04) {
+    return "fade";
+  }
+  return "both";
 }
 
 function holeNumberFromSearch(): number {

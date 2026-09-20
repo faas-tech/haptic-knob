@@ -53,7 +53,7 @@ Add a new demo under `src/demos/`. Call the kit. Do not copy GATT UUIDs into a d
 
 One revolution is one inch. Sixteen detents per revolution are the sixteenth-inch marks. The screen shows a 12-inch stick and a red hairline at the current position.
 
-The firmware's detent command uses one stiffness for every click. The ruler sends a new `detent k=` and `b=` when you approach a quarter, a half, or an inch. If the knob buzzes or runs, drop stiffness and keep a hand on it.
+The firmware's detent command uses one stiffness for every click. The ruler writes a new `detent k=` and `b=` only in the gap before the next sixteenth, eighth, quarter, half, or inch. If the knob buzzes or runs, drop stiffness and keep a hand on it.
 
 ## Naming and voice
 

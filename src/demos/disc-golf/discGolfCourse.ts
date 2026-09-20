@@ -30,7 +30,9 @@ export type CourseHole = {
   treePoints: CoursePointYards[];
 };
 
-export const BASKET_CATCH_RADIUS_YARDS = 1.55;
+export const BASKET_CATCH_RADIUS_YARDS = 2.4;
+export const BASKET_CHAIN_MIN_HEIGHT_YARDS = 1.5;
+export const BASKET_CHAIN_MAX_HEIGHT_YARDS = 6.5;
 export const COURSE_WORLD_WIDTH_YARDS = 200;
 export const COURSE_WORLD_DEPTH_YARDS = 280;
 export const COURSE_NAME = "Neon Circuit";

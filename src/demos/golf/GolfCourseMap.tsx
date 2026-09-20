@@ -23,7 +23,7 @@ import {
   type CoursePointYards,
 } from "./golfCourse";
 import { greenHeightYards } from "./golfGreen";
-import { aimFlightArcPoints } from "./golfShot";
+import { aimFlightArcPoints, type GolfFlightPointYards } from "./golfShot";
 
 const NAVY = 0x0a1628;
 const WHITE = 0xf4f7fb;
@@ -43,6 +43,9 @@ const PUTT_CAMERA_LOOK_AHEAD_YARDS = 4;
 const BALL_RADIUS_YARDS = 0.045;
 const AIM_ARC_DOT_COUNT = 32;
 const AIM_ARC_DOT_RADIUS_YARDS = 0.18;
+const SHAPE_GHOST_DOT_COUNT = 22;
+const SHAPE_GHOST_DOT_RADIUS_YARDS = 0.08;
+const PUTT_AIM_DOT_COUNT = 32;
 
 export type GolfCameraMode = "preview" | "flyover" | "play" | "results";
 
@@ -58,6 +61,11 @@ export function GolfCourseMap(props: {
   flyoverProgress01: number;
   isShotInFlight: boolean;
   ballHeightYards: number;
+  estimateAimPath: GolfFlightPointYards[];
+  drawAimPath: GolfFlightPointYards[];
+  fadeAimPath: GolfFlightPointYards[];
+  visibleAimSide: "both" | "draw" | "fade" | "none";
+  showShapeGhosts: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<GolfScene | null>(null);
@@ -112,7 +120,11 @@ type GolfScene = {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   ballMesh: THREE.Mesh;
-  aimArcDots: THREE.InstancedMesh;
+  estimateAimDots: THREE.InstancedMesh;
+  estimateGroundDots: THREE.InstancedMesh;
+  puttAimDots: THREE.InstancedMesh;
+  drawAimDots: THREE.InstancedMesh;
+  fadeAimDots: THREE.InstancedMesh;
   flagGroup: THREE.Group;
   holeGroup: THREE.Group;
   drawHole: (courseHole: CourseHole) => void;
@@ -128,6 +140,11 @@ type GolfScene = {
     flyoverProgress01: number;
     isShotInFlight: boolean;
     ballHeightYards: number;
+    estimateAimPath: GolfFlightPointYards[];
+    drawAimPath: GolfFlightPointYards[];
+    fadeAimPath: GolfFlightPointYards[];
+    visibleAimSide: "both" | "draw" | "fade" | "none";
+    showShapeGhosts: boolean;
   }) => void;
   resize: () => void;
   dispose: () => void;
@@ -171,19 +188,49 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
   scene.add(ballMesh);
 
   const aimDotDummy = new THREE.Object3D();
-  const aimArcDots = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(AIM_ARC_DOT_RADIUS_YARDS, 10, 8),
+  const estimateAimDots = createAimDotCloud(
+    0xffffff,
+    0.52,
+    AIM_ARC_DOT_RADIUS_YARDS,
+    AIM_ARC_DOT_COUNT,
+  );
+  const estimateGroundDots = createAimDotCloud(
+    0xffffff,
+    0.34,
+    0.12,
+    AIM_ARC_DOT_COUNT,
+  );
+  const puttAimDots = new THREE.InstancedMesh(
+    new THREE.SphereGeometry(0.12, 10, 8),
     new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
       opacity: 0.56,
       depthWrite: false,
     }),
-    AIM_ARC_DOT_COUNT,
+    PUTT_AIM_DOT_COUNT,
   );
-  aimArcDots.frustumCulled = false;
-  aimArcDots.renderOrder = 3;
-  scene.add(aimArcDots);
+  puttAimDots.frustumCulled = false;
+  puttAimDots.renderOrder = 3;
+  const drawAimDots = createAimDotCloud(
+    0xff8ad6,
+    0.26,
+    SHAPE_GHOST_DOT_RADIUS_YARDS,
+    SHAPE_GHOST_DOT_COUNT,
+  );
+  const fadeAimDots = createAimDotCloud(
+    0x9ef6f8,
+    0.26,
+    SHAPE_GHOST_DOT_RADIUS_YARDS,
+    SHAPE_GHOST_DOT_COUNT,
+  );
+  scene.add(
+    estimateAimDots,
+    estimateGroundDots,
+    puttAimDots,
+    drawAimDots,
+    fadeAimDots,
+  );
 
   const flagGroup = new THREE.Group();
   scene.add(flagGroup);
@@ -329,6 +376,11 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
     flyoverProgress01: number;
     isShotInFlight: boolean;
     ballHeightYards: number;
+    estimateAimPath: GolfFlightPointYards[];
+    drawAimPath: GolfFlightPointYards[];
+    fadeAimPath: GolfFlightPointYards[];
+    visibleAimSide: "both" | "draw" | "fade" | "none";
+    showShapeGhosts: boolean;
   }) => {
     const seconds = performance.now() / 1000;
     animateCourseScenery(holeGroup, motionPreference.matches ? 0 : seconds);
@@ -349,18 +401,61 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
         (view.isShotInFlight && !view.aimIsPutt ? 4 : 2.4),
     );
     ballMesh.visible = sink01 < 0.98;
+    const showAim =
+      view.cameraMode === "play" && sink01 === 0 && !view.isShotInFlight;
+    const showPuttAim = showAim && view.aimIsPutt;
+    const showEstimate = showAim && !view.aimIsPutt;
+    const showDrawGhost =
+      showEstimate &&
+      view.showShapeGhosts &&
+      (view.visibleAimSide === "both" || view.visibleAimSide === "draw");
+    const showFadeGhost =
+      showEstimate &&
+      view.showShapeGhosts &&
+      (view.visibleAimSide === "both" || view.visibleAimSide === "fade");
     writeAimArcDotTransforms({
-      instancedDots: aimArcDots,
+      instancedDots: puttAimDots,
       dummy: aimDotDummy,
       courseHole: view.courseHole,
       ball: view.ball,
       headingDegrees: view.aimHeadingDegrees,
       loftDegrees: view.aimLoftDegrees,
       carryYards: view.aimCarryYards,
-      isPutt: view.aimIsPutt,
+      isPutt: true,
     });
-    aimArcDots.visible =
-      view.cameraMode === "play" && sink01 === 0 && !view.isShotInFlight;
+    writeAimPathDots(
+      estimateAimDots,
+      aimDotDummy,
+      showEstimate ? view.estimateAimPath : [],
+      AIM_ARC_DOT_COUNT,
+      true,
+    );
+    writeGroundAimPathDots(
+      estimateGroundDots,
+      aimDotDummy,
+      showEstimate ? view.estimateAimPath : [],
+      view.courseHole,
+      AIM_ARC_DOT_COUNT,
+    );
+    writeAimPathDots(
+      drawAimDots,
+      aimDotDummy,
+      showDrawGhost ? view.drawAimPath : [],
+      SHAPE_GHOST_DOT_COUNT,
+      false,
+    );
+    writeAimPathDots(
+      fadeAimDots,
+      aimDotDummy,
+      showFadeGhost ? view.fadeAimPath : [],
+      SHAPE_GHOST_DOT_COUNT,
+      false,
+    );
+    puttAimDots.visible = showPuttAim;
+    estimateAimDots.visible = showEstimate;
+    estimateGroundDots.visible = showEstimate;
+    drawAimDots.visible = showDrawGhost;
+    fadeAimDots.visible = showFadeGhost;
     const slopeGrid = holeGroup.getObjectByName("green-slope-grid");
     if (slopeGrid) slopeGrid.visible = view.aimIsPutt && !view.isShotInFlight;
 
@@ -474,7 +569,11 @@ function createGolfScene(canvas: HTMLCanvasElement): GolfScene {
     scene,
     camera,
     ballMesh,
-    aimArcDots,
+    estimateAimDots,
+    estimateGroundDots,
+    puttAimDots,
+    drawAimDots,
+    fadeAimDots,
     flagGroup,
     holeGroup,
     drawHole,
@@ -601,6 +700,88 @@ function surfaceDisc(
   return disc;
 }
 
+function createAimDotCloud(
+  color: number,
+  opacity: number,
+  radiusYards: number,
+  dotCount: number,
+) {
+  const dots = new THREE.InstancedMesh(
+    new THREE.SphereGeometry(radiusYards, 10, 8),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+    }),
+    dotCount,
+  );
+  dots.frustumCulled = false;
+  dots.renderOrder = 3;
+  return dots;
+}
+
+function writeAimPathDots(
+  instancedDots: THREE.InstancedMesh,
+  dummy: THREE.Object3D,
+  aimPath: GolfFlightPointYards[],
+  dotCount: number,
+  scaleWithDistance: boolean,
+) {
+  const usable = aimPath.slice(1);
+  for (let index = 0; index < dotCount; index += 1) {
+    if (usable.length === 0) {
+      dummy.position.set(0, -20, 0);
+      dummy.scale.setScalar(0.01);
+    } else {
+      const sourceIndex = Math.min(
+        usable.length - 1,
+        Math.round((index / Math.max(1, dotCount - 1)) * (usable.length - 1)),
+      );
+      const point = usable[sourceIndex];
+      const distance01 = index / Math.max(1, dotCount - 1);
+      dummy.position.set(point.xYards, point.heightYards + 0.12, point.yYards);
+      dummy.scale.setScalar(
+        scaleWithDistance ? 0.85 + 2.6 * distance01 : 0.9,
+      );
+    }
+    dummy.updateMatrix();
+    instancedDots.setMatrixAt(index, dummy.matrix);
+  }
+  instancedDots.instanceMatrix.needsUpdate = true;
+}
+
+function writeGroundAimPathDots(
+  instancedDots: THREE.InstancedMesh,
+  dummy: THREE.Object3D,
+  aimPath: GolfFlightPointYards[],
+  courseHole: CourseHole,
+  dotCount: number,
+) {
+  const usable = aimPath.slice(1);
+  for (let index = 0; index < dotCount; index += 1) {
+    if (usable.length === 0) {
+      dummy.position.set(0, -20, 0);
+      dummy.scale.setScalar(0.01);
+    } else {
+      const sourceIndex = Math.min(
+        usable.length - 1,
+        Math.round((index / Math.max(1, dotCount - 1)) * (usable.length - 1)),
+      );
+      const point = usable[sourceIndex];
+      dummy.position.set(
+        point.xYards,
+        greenHeightYards(courseHole, point) + 0.05,
+        point.yYards,
+      );
+      dummy.scale.setScalar(0.55 + 0.7 * (index / Math.max(1, dotCount - 1)));
+    }
+    dummy.updateMatrix();
+    instancedDots.setMatrixAt(index, dummy.matrix);
+  }
+  instancedDots.instanceMatrix.needsUpdate = true;
+}
+
 function writeAimArcDotTransforms(args: {
   instancedDots: THREE.InstancedMesh;
   dummy: THREE.Object3D;
@@ -616,8 +797,8 @@ function writeAimArcDotTransforms(args: {
   const alongZ = Math.cos(headingRadians);
   const carryYards = Math.max(args.carryYards, 1);
   if (args.isPutt) {
-    for (let index = 0; index < AIM_ARC_DOT_COUNT; index += 1) {
-      const alongYards = (carryYards * (index + 1)) / AIM_ARC_DOT_COUNT;
+    for (let index = 0; index < PUTT_AIM_DOT_COUNT; index += 1) {
+      const alongYards = (carryYards * (index + 1)) / PUTT_AIM_DOT_COUNT;
       const point = {
         xYards: args.ball.xYards + alongX * alongYards,
         yYards: args.ball.yYards + alongZ * alongYards,

@@ -56,6 +56,7 @@ describe("ruler marks", () => {
     expect(rulerMarkKind(3)).toBe("inch");
     expect(rulerMarkKind(3.5)).toBe("half");
     expect(rulerMarkKind(3.25)).toBe("quarter");
+    expect(rulerMarkKind(3.125)).toBe("eighth");
     expect(rulerMarkKind(3.0625)).toBe("sixteenth");
   });
 

@@ -366,6 +366,13 @@ export function headingDegreesToCup(
   );
 }
 
+export function startingAimHeadingDegrees(
+  courseHole: CourseHole,
+  from: CoursePointYards,
+): number {
+  return headingDegreesToCup(from, courseHole.cup);
+}
+
 export function surfaceAtPosition(
   courseHole: CourseHole,
   position: CoursePointYards,

@@ -10,6 +10,10 @@ import {
   GolfHeaderActions,
   type GolfHeaderActionsState,
 } from "./ui/GolfHeaderActions";
+import {
+  RulerHeaderActions,
+  type RulerHeaderActionsState,
+} from "./ui/RulerHeaderActions";
 import { LabShell } from "./ui/LabShell";
 import { LaunchScreen } from "./ui/LaunchScreen";
 import { useLabRoute } from "./ui/useLabRoute";
@@ -21,6 +25,8 @@ export function App() {
   const isRulerOpen = route === "/ruler";
   const isGolfOpen = route === "/golf";
   const isDiscGolfOpen = route === "/disc-golf";
+  const [rulerHeaderActions, setRulerHeaderActions] =
+    useState<RulerHeaderActionsState | null>(null);
   const [golfHeaderActions, setGolfHeaderActions] =
     useState<GolfHeaderActionsState | null>(null);
   const [discGolfHeaderActions, setDiscGolfHeaderActions] =
@@ -37,7 +43,9 @@ export function App() {
       onBackToLaunch={() => openRoute("/")}
       showBackToLaunch={isRulerOpen || isGolfOpen || isDiscGolfOpen}
       headerExtra={
-        isGolfOpen && golfHeaderActions ? (
+        isRulerOpen && rulerHeaderActions ? (
+          <RulerHeaderActions {...rulerHeaderActions} />
+        ) : isGolfOpen && golfHeaderActions ? (
           <GolfHeaderActions {...golfHeaderActions} />
         ) : isDiscGolfOpen && discGolfHeaderActions ? (
           <DiscGolfHeaderActions {...discGolfHeaderActions} />
@@ -49,6 +57,7 @@ export function App() {
           isConnected={smartKnob.connectionStatus === "connected"}
           latestStreamSample={smartKnob.latestStreamSample}
           sendKnobCommand={smartKnob.sendKnobCommand}
+          onHeaderActionsChange={setRulerHeaderActions}
         />
       ) : isGolfOpen ? (
         <GolfDemo

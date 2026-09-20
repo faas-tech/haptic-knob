@@ -4,7 +4,7 @@ Chrome lab for the ECM SmartKnob kit. First demo is a 12-inch ruler.
 
 ## Key rules
 
-1. Read [docs/knob-interface.md](docs/knob-interface.md) before sending a new Bluetooth command. Observed commands live in `src/sdk/commands.ts`.
+1. Read [docs/knob-interface.md](docs/knob-interface.md) and [docs/controlling-the-smartknob.md](docs/controlling-the-smartknob.md) before sending a new Bluetooth command. Observed commands live in `src/sdk/commands.ts`.
 2. Demos call `sendKnobCommand`. Bluetooth stays in `src/sdk/`.
 3. Use [readable-names](.cursor/skills/readable-names/SKILL.md) for identifiers.
 4. Use Give It to Me Straight for documentation. After drafting, run the last-sentence second pass.
@@ -17,6 +17,7 @@ Chrome lab for the ECM SmartKnob kit. First demo is a 12-inch ruler.
 |---|---|
 | Human setup | [README.md](README.md) |
 | Bluetooth commands | [docs/knob-interface.md](docs/knob-interface.md) |
+| How a demo drives the motor | [docs/controlling-the-smartknob.md](docs/controlling-the-smartknob.md) |
 | Agent defaults | [AGENTS.md](AGENTS.md) |
 | Code names | [.cursor/skills/readable-names/SKILL.md](.cursor/skills/readable-names/SKILL.md) |
 | Documentation | `~/.agents/skills/give-it-to-me-straight/SKILL.md` |

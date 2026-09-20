@@ -2,12 +2,14 @@ import { CoursePlayerInterface } from "../course-visuals/CoursePlayerInterface";
 import { SWING_CLUBS, PUTTER, type ClubId } from "./golfClubs";
 import { COURSE_NAME, type CourseHole } from "./golfCourse";
 import type { CourseWind } from "./golfWind";
-export type GolfPlayMode = "direction" | "shoot";
+import { SwingShapeMeter } from "./SwingShapeMeter";
+export type GolfPlayMode = "direction" | "club" | "swing";
 
 export type GolfShotResultBanner = {
   bannerKey: number;
   powerPercent: number;
   travelYards: number;
+  shapeLabel?: string;
 };
 
 export function GolfPlayerDashboard(props: {
@@ -17,6 +19,7 @@ export function GolfPlayerDashboard(props: {
   selectedClubId: ClubId;
   isPutterLocked: boolean;
   windPower: number;
+  swingShape01: number;
   courseWind: CourseWind;
   strokesThisHole: number;
   yardsToCup: number;
@@ -27,7 +30,8 @@ export function GolfPlayerDashboard(props: {
   lieLabel: string;
   shotResultBanner: GolfShotResultBanner | null;
   onSelectDirectionMode: () => void;
-  onSelectShootMode: () => void;
+  onSelectClubMode: () => void;
+  onSelectSwingMode: () => void;
   position: { xYards: number; yYards: number };
   headingDegrees: number;
   isInFlight: boolean;
@@ -65,19 +69,27 @@ export function GolfPlayerDashboard(props: {
       isInFlight={props.isInFlight}
       isComplete={props.isComplete}
       isAiming={props.playMode === "direction"}
+      isSelectingClub={props.playMode === "club"}
+      onSelectClubMode={props.onSelectClubMode}
       windSpeedMph={Math.round(props.courseWind.speedMph)}
       windHeadingDegrees={props.courseWind.blowToHeadingDegrees}
       equipmentName={equipment.name}
       equipmentDetail={
         props.isPutterLocked
           ? "On the green · putter"
-          : `${equipment.carryYards} yd carry · [ ] to change`
+          : `${equipment.carryYards} yd carry · C then turn`
       }
       canChangeEquipment={!props.isPutterLocked}
       onPreviousEquipment={props.onPreviousEquipment}
       onNextEquipment={props.onNextEquipment}
       onAim={props.onSelectDirectionMode}
-      onPrepareShot={props.onSelectShootMode}
+      onPrepareShot={props.onSelectSwingMode}
+      bendMeter={
+        <SwingShapeMeter
+          swingPower={props.windPower}
+          swingShape01={props.swingShape01}
+        />
+      }
       onAimLeft={props.onAimLeft}
       onAimRight={props.onAimRight}
       onCharge={props.onCharge}
@@ -95,6 +107,7 @@ export function GolfPlayerDashboard(props: {
               key: result.bannerKey,
               powerPercent: result.powerPercent,
               travelYards: result.travelYards,
+              detail: result.shapeLabel,
             }
           : null
       }

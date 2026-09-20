@@ -22,7 +22,7 @@ export const DISC_BAG: DiscGolfDisc[] = [
     fadeRating: 3.1,
     windSensitivity: 1,
     glide: 5.2,
-    loftDegrees: 12,
+    loftDegrees: 18,
   },
   {
     id: "standard",
@@ -33,7 +33,7 @@ export const DISC_BAG: DiscGolfDisc[] = [
     fadeRating: 1.8,
     windSensitivity: 0.5,
     glide: 4,
-    loftDegrees: 10,
+    loftDegrees: 16,
   },
   {
     id: "target",
@@ -44,7 +44,7 @@ export const DISC_BAG: DiscGolfDisc[] = [
     fadeRating: 0.7,
     windSensitivity: 0.22,
     glide: 3,
-    loftDegrees: 8,
+    loftDegrees: 20,
   },
 ];
 
@@ -69,4 +69,11 @@ export function nextDiscId(discId: DiscId): DiscId {
 
 export function previousDiscId(discId: DiscId): DiscId {
   return discAtBagIndex(bagIndexForDiscId(discId) - 1).id;
+}
+
+export function discAfterDetentSteps(
+  startDiscId: DiscId,
+  detentSteps: number,
+): DiscId {
+  return discAtBagIndex(bagIndexForDiscId(startDiscId) + detentSteps).id;
 }

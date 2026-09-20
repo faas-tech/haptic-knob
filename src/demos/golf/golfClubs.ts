@@ -72,7 +72,7 @@ export const PUTTER: GolfClub = {
   carryYards: 0,
   loftDegrees: 3,
   rollFactor: 1,
-  puttYards: 28,
+  puttYards: 36,
 };
 
 export const SWING_CLUB_COUNT = SWING_CLUBS.length;
@@ -95,4 +95,19 @@ export function nextSwingClubId(clubId: SwingClubId): SwingClubId {
 export function previousSwingClubId(clubId: SwingClubId): SwingClubId {
   const detentIndex = detentIndexForSwingClubId(clubId);
   return swingClubAtDetentIndex(detentIndex - 1).id as SwingClubId;
+}
+
+export function swingClubAfterDetentSteps(
+  startClubId: SwingClubId,
+  detentSteps: number,
+): SwingClubId {
+  const startIndex = detentIndexForSwingClubId(startClubId);
+  return swingClubAtDetentIndex(startIndex + detentSteps).id as SwingClubId;
+}
+
+export function swingClubAfterLeftDetentSteps(
+  startClubId: SwingClubId,
+  leftDetentSteps: number,
+): SwingClubId {
+  return swingClubAfterDetentSteps(startClubId, leftDetentSteps);
 }

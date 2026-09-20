@@ -14,11 +14,22 @@ export function damperSettingsCommand(settings: DamperSettings): string {
 }
 
 export function springSettingsCommand(settings: SpringSettings): string {
-  return `spring k=${settings.stiffnessPercent} b=${settings.dampingPercent}`;
+  const springLine = `spring k=${settings.stiffnessPercent} b=${settings.dampingPercent}`;
+  if (settings.deadbandDegrees == null) {
+    return springLine;
+  }
+  return `${springLine} deadband=${settings.deadbandDegrees}`;
 }
 
 export function detentSettingsCommand(settings: DetentSettings): string {
   return `detent count=${settings.detentCount} k=${settings.stiffnessPercent} b=${settings.dampingPercent}`;
+}
+
+export function terminatedKnobCommandLine(command: string): string {
+  if (command.endsWith("\n") || command.endsWith("\r")) {
+    return command;
+  }
+  return `${command}\n`;
 }
 
 export const KNOB_COMMANDS = {

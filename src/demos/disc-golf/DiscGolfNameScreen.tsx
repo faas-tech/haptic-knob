@@ -64,7 +64,7 @@ export function DiscGolfNameScreen(props: {
         <p className="course-welcome-controls">
           Play with your knob, mouse, or keyboard.
           <br />
-          <kbd>← →</kbd> Aim <kbd>SPACE</kbd> Hold and release
+          <kbd>A</kbd> Aim <kbd>C</kbd> Discs <kbd>S</kbd> Throw
         </p>
         <DiscGolfLeaderboardTable
           entries={props.leaderboard}

@@ -3,7 +3,7 @@ import { ThrowBendMeter } from "./ThrowBendMeter";
 import { discById, type DiscId } from "./discGolfDiscs";
 import { COURSE_NAME, type CourseHole } from "./discGolfCourse";
 import type { CourseWind } from "./discGolfWind";
-export type DiscGolfPlayMode = "direction" | "throw";
+export type DiscGolfPlayMode = "direction" | "disc" | "throw";
 
 export type DiscGolfThrowBanner = {
   bannerKey: number;
@@ -29,6 +29,7 @@ export function DiscGolfPlayerDashboard(props: {
   lieLabel: string;
   throwBanner: DiscGolfThrowBanner | null;
   onSelectDirectionMode: () => void;
+  onSelectDiscMode: () => void;
   onSelectThrowMode: () => void;
   position: { xYards: number; yYards: number };
   headingDegrees: number;
@@ -66,10 +67,12 @@ export function DiscGolfPlayerDashboard(props: {
       isInFlight={props.isInFlight}
       isComplete={props.isComplete}
       isAiming={props.playMode === "direction"}
+      isSelectingClub={props.playMode === "disc"}
+      onSelectClubMode={props.onSelectDiscMode}
       windSpeedMph={Math.round(props.courseWind.speedMph)}
       windHeadingDegrees={props.courseWind.blowToHeadingDegrees}
       equipmentName={equipment.name}
-      equipmentDetail={`${equipment.carryYards} yd carry · [ ] to change`}
+      equipmentDetail={`${equipment.carryYards} yd carry · C then turn`}
       canChangeEquipment={true}
       onPreviousEquipment={props.onPreviousEquipment}
       onNextEquipment={props.onNextEquipment}

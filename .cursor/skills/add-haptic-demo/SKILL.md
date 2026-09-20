@@ -7,7 +7,7 @@ description: >-
 
 # Add a haptic demo
 
-1. Read `docs/knob-interface.md` and `src/sdk/index.ts`.
+1. Read `docs/controlling-the-smartknob.md`, `docs/knob-interface.md`, and `src/sdk/index.ts`.
 2. Create `src/demos/<demo-name>/` with a React component that takes
    `isConnected`, `latestStreamSample`, and `sendKnobCommand`.
 3. Do not call `navigator.bluetooth` from the demo.
