@@ -23,6 +23,7 @@ export type ShotResult = {
   treePoint: CoursePointYards | null;
   dropPosition: CoursePointYards | null;
   displayPath: CoursePointYards[];
+  landingPathIndex: number;
 };
 
 export const PUTT_CAPTURE_RADIUS_YARDS = 1.7;
@@ -175,8 +176,39 @@ export function shotLateralYards(args: {
 }): number {
   const t = Math.max(0, Math.min(1, args.progress01));
   const shape01 = Math.max(-1, Math.min(1, args.shape01));
-  const bananaArc01 = (1 - Math.cos(Math.PI * t)) / 2;
-  return shape01 * args.carryYards * SIDE_SPIN_CURVE_FRACTION * bananaArc01;
+  const holdThenFall01 = t * t;
+  return shape01 * args.carryYards * SIDE_SPIN_CURVE_FRACTION * holdThenFall01;
+}
+
+export function landingTangentHeadingDegrees(args: {
+  headingDegrees: number;
+  shape01: number;
+}): number {
+  const rightSlope =
+    Math.max(-1, Math.min(1, args.shape01)) * SIDE_SPIN_CURVE_FRACTION * 2;
+  return args.headingDegrees + (Math.atan(rightSlope) * 180) / Math.PI;
+}
+
+export function bounceHopHeightYards(args: {
+  afterLandingYards: number;
+  hopSpanYards: number;
+  firstHopHeightYards: number;
+}): number {
+  if (args.afterLandingYards <= 0 || args.hopSpanYards <= 0) {
+    return 0;
+  }
+  const span01 = args.afterLandingYards / args.hopSpanYards;
+  if (span01 >= 1) {
+    return 0;
+  }
+  if (span01 < 0.62) {
+    return args.firstHopHeightYards * Math.sin((span01 / 0.62) * Math.PI);
+  }
+  return (
+    args.firstHopHeightYards *
+    0.32 *
+    Math.sin(((span01 - 0.62) / 0.38) * Math.PI)
+  );
 }
 
 export function pointAlongShotShape(args: {
@@ -297,25 +329,31 @@ export function playGolfShot(args: {
     ? args.club.puttYards * power
     : args.club.carryYards * power;
 
-  const carryPoints = sampleShapedShotPoints({
+  const shapedCarryPoints = sampleShapedShotPoints({
     origin: args.ball,
     headingDegrees: args.headingDegrees,
     carryYards,
     shape01,
   });
-  const uncorrectedLanding =
-    carryPoints[carryPoints.length - 1] ??
-    pointAlongHeading(args.ball, args.headingDegrees, carryYards);
   const windOffset = windPushYards({
     courseWind: args.courseWind,
     carryYards,
     loftDegrees: args.club.loftDegrees,
     isPutter,
   });
-  const landing = {
-    xYards: uncorrectedLanding.xYards + windOffset.xYards,
-    yYards: uncorrectedLanding.yYards + windOffset.yYards,
-  };
+  const carryPoints = shapedCarryPoints.map((point, index) => {
+    const wind01 =
+      shapedCarryPoints.length < 2
+        ? 1
+        : index / (shapedCarryPoints.length - 1);
+    return {
+      xYards: point.xYards + windOffset.xYards * wind01,
+      yYards: point.yYards + windOffset.yYards * wind01,
+    };
+  });
+  const landing =
+    carryPoints[carryPoints.length - 1] ??
+    pointAlongHeading(args.ball, args.headingDegrees, carryYards);
 
   const treeOnCarry = firstTreeHitOnShapedPath(
     args.courseHole,
@@ -345,17 +383,14 @@ export function playGolfShot(args: {
       treePoint: null,
       dropPosition: args.lastSafeLie,
       displayPath: carryPoints,
+      landingPathIndex: Math.max(0, carryPoints.length - 1),
     };
   }
 
-  const previousCarryPoint =
-    carryPoints.length > 1
-      ? carryPoints[carryPoints.length - 2]
-      : args.ball;
-  const rollHeadingDegrees = headingDegreesBetweenPoints(
-    previousCarryPoint,
-    landing,
-  );
+  const rollHeadingDegrees = landingTangentHeadingDegrees({
+    headingDegrees: args.headingDegrees,
+    shape01,
+  });
   const rollYards = isPutter
     ? 0
     : carryYards * args.club.rollFactor * SURFACE_ROLL[landingSurface];
@@ -397,6 +432,7 @@ export function playGolfShot(args: {
       treePoint: null,
       dropPosition: null,
       displayPath: puttFinish.path,
+      landingPathIndex: Math.max(0, puttFinish.path.length - 1),
     };
   }
 
@@ -414,6 +450,7 @@ export function playGolfShot(args: {
       treePoint: null,
       dropPosition: landing,
       displayPath: carryPoints,
+      landingPathIndex: Math.max(0, carryPoints.length - 1),
     };
   }
 
@@ -436,7 +473,8 @@ export function playGolfShot(args: {
     displayPath:
       distanceYards(landing, restPoint) < 0.2
         ? carryPoints
-        : [...carryPoints, restPoint],
+        : [...carryPoints, ...roll.path],
+    landingPathIndex: Math.max(0, carryPoints.length - 1),
   };
 }
 
@@ -588,9 +626,9 @@ function rollBallAfterLanding(args: {
   landing: CoursePointYards;
   headingDegrees: number;
   rollYards: number;
-}): { rest: CoursePointYards } {
+}): { rest: CoursePointYards; path: CoursePointYards[] } {
   if (args.rollYards < 0.08) {
-    return { rest: args.landing };
+    return { rest: args.landing, path: [] };
   }
   const headingRadians = (args.headingDegrees * Math.PI) / 180;
   const alongX = Math.sin(headingRadians);
@@ -599,11 +637,12 @@ function rollBallAfterLanding(args: {
   let yYards = args.landing.yYards;
   let remainingYards = args.rollYards;
   let rest = args.landing;
+  const path: CoursePointYards[] = [];
   for (let stepIndex = 0; stepIndex < 90 && remainingYards > 0.08; stepIndex += 1) {
     const surface = surfaceAtPosition(args.courseHole, { xYards, yYards });
     const consumeScale = ROLL_CONSUME_BY_SURFACE[surface];
     if (surface === "water" || surface === "cup") {
-      return { rest };
+      return { rest, path };
     }
     const stepYards = Math.min(ROLL_STEP_YARDS, remainingYards / consumeScale);
     remainingYards -= stepYards * consumeScale;
@@ -611,11 +650,12 @@ function rollBallAfterLanding(args: {
     yYards += alongY * stepYards;
     const next = { xYards, yYards };
     if (surfaceAtPosition(args.courseHole, next) === "water") {
-      return { rest };
+      return { rest, path };
     }
     rest = next;
+    path.push(next);
   }
-  return { rest };
+  return { rest, path };
 }
 
 function treeShotResult(
@@ -635,5 +675,6 @@ function treeShotResult(
     treePoint,
     dropPosition: null,
     displayPath: [from, restAtBase],
+    landingPathIndex: 1,
   };
 }

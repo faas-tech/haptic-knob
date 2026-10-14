@@ -19,6 +19,7 @@ import {
   type CourseHole,
 } from "./golfCourse";
 import {
+  headingDegreesBetweenPoints,
   liePowerScale,
   playGolfShot,
   aimFlightArcPoints,
@@ -279,7 +280,7 @@ describe("shotLateralYards", () => {
     expect(shotLateralYards({ progress01: 0, shape01: 1, carryYards: 100 })).toBeCloseTo(0, 5);
     expect(
       shotLateralYards({ progress01: 0.5, shape01: 1, carryYards: 100 }),
-    ).toBeCloseTo(6, 5);
+    ).toBeCloseTo(3, 5);
     expect(shotLateralYards({ progress01: 1, shape01: 1, carryYards: 100 })).toBeCloseTo(12, 5);
     expect(
       shotLateralYards({ progress01: 0.25, shape01: 1, carryYards: 100 }),
@@ -288,7 +289,7 @@ describe("shotLateralYards", () => {
     );
     expect(
       shotLateralYards({ progress01: 0.5, shape01: -1, carryYards: 100 }),
-    ).toBeCloseTo(-6, 5);
+    ).toBeCloseTo(-3, 5);
   });
 });
 
@@ -319,6 +320,49 @@ describe("shot shape", () => {
       const outgoing = laterals[index + 1] - laterals[index];
       expect(Math.abs(outgoing - incoming)).toBeLessThan(0.35);
     }
+  });
+
+  it("keeps bounce and roll on the incoming fade heading", () => {
+    const hole = treeTestHole([]);
+    const shot = playGolfShot({
+      courseHole: hole,
+      ball: hole.tee,
+      lastSafeLie: hole.tee,
+      club: SWING_CLUBS[0],
+      headingDegrees: 0,
+      power: 1,
+      courseWind: CALM_WIND,
+      shape01: 1,
+    });
+    const landingIndex = shot.displayPath.findIndex(
+      (point) =>
+        Math.abs(point.xYards - shot.landing.xYards) < 0.05 &&
+        Math.abs(point.yYards - shot.landing.yYards) < 0.05,
+    );
+    expect(landingIndex).toBeGreaterThan(8);
+    expect(shot.displayPath.length - landingIndex).toBeGreaterThan(4);
+    const lateFlight = shot.displayPath[Math.max(0, landingIndex - 8)];
+    const incomingHeadingDegrees = headingDegreesBetweenPoints(
+      lateFlight,
+      shot.landing,
+    );
+    const firstGroundPoint = shot.displayPath[landingIndex + 1];
+    const groundHeadingDegrees = headingDegreesBetweenPoints(
+      shot.landing,
+      firstGroundPoint,
+    );
+    expect(Math.abs(groundHeadingDegrees - incomingHeadingDegrees)).toBeLessThan(
+      6,
+    );
+    expect(shot.rest.xYards).toBeGreaterThan(shot.landing.xYards - 0.2);
+    const incomingSlope =
+      (shot.landing.xYards - lateFlight.xYards) /
+      Math.max(0.2, shot.landing.yYards - lateFlight.yYards);
+    const groundSlope =
+      (shot.rest.xYards - shot.landing.xYards) /
+      Math.max(0.2, shot.rest.yYards - shot.landing.yYards);
+    expect(groundSlope).toBeGreaterThan(incomingSlope * 0.4);
+    expect(groundSlope).toBeLessThan(incomingSlope * 1.4);
   });
 
   it("curves a draw left in a smooth arc that starts on the aim line", () => {
@@ -355,6 +399,7 @@ describe("shot shape", () => {
     expect(path[0]).toMatchObject({ xYards: 0, yYards: 0, heightYards: 0 });
     expect(path[16].heightYards).toBeGreaterThan(8);
     expect(path[16].xYards).toBeGreaterThan(2);
+    expect(path[16].xYards).toBeLessThan(5);
     expect(path[32].xYards).toBeCloseTo(12, 5);
     expect(path[32].heightYards).toBeCloseTo(0, 5);
   });

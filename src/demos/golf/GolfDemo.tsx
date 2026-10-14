@@ -42,6 +42,7 @@ import {
   type CoursePointYards,
 } from "./golfCourse";
 import {
+  bounceHopHeightYards,
   clampPower,
   FULL_WIND_DEGREES,
   liePowerLabel,
@@ -332,6 +333,7 @@ export function GolfDemo(props: {
     carryYards: number,
     loftDegrees: number,
     isPutt: boolean,
+    landingPathIndex: number,
   ) => {
     isAnimatingShotRef.current = true;
     setIsShotInFlight(true);
@@ -343,6 +345,7 @@ export function GolfDemo(props: {
       end.xYards - start.xYards,
       end.yYards - start.yYards,
     );
+    const airPathYards = polylineYardsThroughIndex(path, landingPathIndex);
     const durationMs = isPutt
       ? Math.min(1800, 700 + travelYards * 36)
       : Math.min(3200, 1500 + travelYards * 6);
@@ -353,15 +356,22 @@ export function GolfDemo(props: {
       setDisplayBall(alongPath.point);
       const flightProgress01 = Math.min(
         1,
-        alongPath.alongYards / Math.max(0.01, carryYards),
+        alongPath.alongYards / Math.max(0.01, airPathYards),
       );
       const peakHeightYards =
         (carryYards * Math.tan((loftDegrees * Math.PI) / 180)) / 4;
-      const isRolling = alongPath.alongYards > carryYards + 0.05;
+      const afterLandingYards = alongPath.alongYards - airPathYards;
+      const isInTheAir = afterLandingYards <= 0.05;
       setBallHeightYards(
-        isPutt || isRolling
+        isPutt
           ? 0
-          : 4 * peakHeightYards * flightProgress01 * (1 - flightProgress01),
+          : isInTheAir
+            ? 4 * peakHeightYards * flightProgress01 * (1 - flightProgress01)
+            : bounceHopHeightYards({
+                afterLandingYards,
+                hopSpanYards: Math.min(18, Math.max(4, carryYards * 0.12)),
+                firstHopHeightYards: Math.min(3.2, peakHeightYards * 0.16),
+              }),
       );
       if (t < 1) {
         shotAnimationFrameRef.current = window.requestAnimationFrame(step);
@@ -509,6 +519,7 @@ export function GolfDemo(props: {
       ),
       selectedClub.loftDegrees,
       selectedClub.id === "putter",
+      shot.landingPathIndex,
     );
   };
 
@@ -1041,6 +1052,21 @@ export function GolfDemo(props: {
       ) : null}
     </section>
   );
+}
+
+function polylineYardsThroughIndex(
+  path: CoursePointYards[],
+  lastIndex: number,
+): number {
+  const endIndex = Math.max(0, Math.min(path.length - 1, lastIndex));
+  let totalYards = 0;
+  for (let index = 0; index < endIndex; index += 1) {
+    totalYards += Math.hypot(
+      path[index + 1].xYards - path[index].xYards,
+      path[index + 1].yYards - path[index].yYards,
+    );
+  }
+  return Math.max(0.01, totalYards);
 }
 
 function pointAlongDisplayPath(
